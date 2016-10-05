@@ -177,21 +177,39 @@ if ($alterconf['REMOTEAPI_ENABLED']) {
                         $allusermacs = zb_UserGetAllMACs();
                         $alladdress = zb_AddressGetFullCityaddresslist();
                         $alldeadswitches = zb_SwitchesGetAllDead();
-
+                        $swpollLogData = '';
+                        $swpollLogPath = 'exports/swpolldata.log';
                         if (!empty($allDevices)) {
+                            //start new polling
+                            file_put_contents($swpollLogPath, date("Y-m-d H:i:s") . ' [SWPOLLSTART]' . "\n", FILE_APPEND);
                             foreach ($allDevices as $io => $eachDevice) {
+                                $swpollLogData = '';
                                 if (!empty($allTemplatesAssoc)) {
                                     if (isset($allTemplatesAssoc[$eachDevice['modelid']])) {
                                         //dont poll dead devices
                                         if (!isset($alldeadswitches[$eachDevice['ip']])) {
+                                            //dont poll NP devices - commented due testing
+                                            // if (!ispos($eachDevice['desc'], 'NP')) {
                                             $deviceTemplate = $allTemplatesAssoc[$eachDevice['modelid']];
                                             sp_SnmpPollDevice($eachDevice['ip'], $eachDevice['snmp'], $allTemplates, $deviceTemplate, $allusermacs, $alladdress, true);
-                                            print(date("Y-m-d H:i:s") . ' ' . $eachDevice['ip'] . ' [OK]' . "\n");
+                                            $swpollLogData = date("Y-m-d H:i:s") . ' ' . $eachDevice['ip'] . ' [OK]' . "\n";
+                                            print($swpollLogData);
+//                                            } else {
+//                                                $swpollLogData = date("Y-m-d H:i:s") . ' ' . $eachDevice['ip'] . ' [FAIL] SWITCH NP' . "\n";
+//                                                print($swpollLogData);
+//                                            }
                                         } else {
-                                            print(date("Y-m-d H:i:s") . ' ' . $eachDevice['ip'] . ' [FAIL]' . "\n");
+                                            $swpollLogData = date("Y-m-d H:i:s") . ' ' . $eachDevice['ip'] . ' [FAIL] SWITCH DEAD' . "\n";
+                                            print($swpollLogData);
                                         }
+                                    } else {
+                                        $swpollLogData = date("Y-m-d H:i:s") . ' ' . $eachDevice['ip'] . ' [FAIL] NO TEMPLATE' . "\n";
+                                        print($swpollLogData);
                                     }
                                 }
+
+                                //put some log data about polling
+                                file_put_contents($swpollLogPath, $swpollLogData, FILE_APPEND);
                             }
                             die('OK:SWPOLL');
                         } else {
@@ -536,6 +554,144 @@ if ($alterconf['REMOTEAPI_ENABLED']) {
                         $globalSearch->ajaxCallback(true);
                         die('OK:REBUILDGLSCACHE');
                     }
+
+                    /*
+                     * send sms queue to remind users about payments
+                     */
+                    if ($_GET['action'] == 'reminder') {
+                        if ($alterconf['REMINDER_ENABLED']) {
+                            $sms = new Reminder();
+                            $sms->RemindUser();
+                            die('OK:SEND REMIND SMS');
+                        } else {
+                            die('ERROR:REMINDER DISABLED');
+                        }
+                    }
+
+                    /*
+                     * friendship processing
+                     */
+                    if ($_GET['action'] == 'friendshipdaily') {
+                        if ($alterconf['FRIENDSHIP_ENABLED']) {
+                            $friends = new FriendshipIsMagic();
+                            $friends->friendsDailyProcessing();
+                            die('OK:FRIENDSHIP');
+                        } else {
+                            die('ERROR:FRIENDSHIP DISABLED');
+                        }
+                    }
+
+                    /*
+                     * Per month freezing fees
+                     */
+                    if ($_GET['action'] == 'freezemonth') {
+                        $money = new FundsFlow();
+                        $money->runDataLoders();
+                        $money->makeFreezeMonthFee();
+                        die('OK:FREEZEMONTH');
+                    }
+
+                    /**
+                     * UserSide get API handling
+                     */
+                    if ($_GET['action'] == 'userside') {
+                        if ($alterconf['USERSIDE_API']) {
+                            $usersideapi = new UserSideApi();
+                            $usersideapi->catchRequest();
+                        } else {
+                            die('ERROR:NO_USERSIDE_API_ENABLED');
+                        }
+                    }
+
+                    if ($_GET['action'] == 'writevlanmachistory') {
+                        if ($alterconf['VLANMACHISTORY']) {
+                            $history = new VlanMacHistory;
+                            $history->WriteVlanMacData();
+                            die('OK:WRITING NEW MACS');
+                        } else {
+                            die('ERROR:NO_VLAN_MAC_HISTORY ENABLED');
+                        }
+                    }
+
+                    //deal with it delayed tasks processing
+                    if ($_GET['action'] == 'dealwithit') {
+                        if ($alterconf['DEALWITHIT_ENABLED']) {
+                            $dealWithIt = new DealWithIt();
+                            $dealWithIt->tasksProcessing();
+                            die('OK:DEALWITHIT');
+                        } else {
+                            die('ERROR:DEALWITHIT DISABLED');
+                        }
+                    }
+
+                    //Megogo userstats control options
+                    if ($_GET['action'] == 'mgcontrol') {
+                        if ($alterconf['MG_ENABLED']) {
+                            if (wf_CheckGet(array('param', 'tariffid', 'userlogin'))) {
+
+                                if ($_GET['param'] == 'subscribe') {
+                                    $mgIface = new MegogoInterface();
+                                    $mgSubResult = $mgIface->createSubscribtion($_GET['userlogin'], $_GET['tariffid']);
+                                    die($mgSubResult);
+                                }
+
+                                if ($_GET['param'] == 'unsubscribe') {
+                                    $mgIface = new MegogoInterface();
+                                    $mgUnsubResult = $mgIface->scheduleUnsubscribe($_GET['userlogin'], $_GET['tariffid']);
+                                    die($mgUnsubResult);
+                                }
+                            }
+
+                            if (wf_CheckGet(array('param', 'userlogin'))) {
+                                if ($_GET['param'] == 'auth') {
+                                    $mgApi = new MegogoApi();
+                                    $authUrlData = $mgApi->authCode($_GET['userlogin']);
+                                    die($authUrlData);
+                                }
+                            }
+                        } else {
+                            die('ERROR: MEGOGO DISABLED');
+                        }
+                    }
+
+
+                    //Megogo schedule processing
+                    if ($_GET['action'] == 'mgqueue') {
+                        if ($alterconf['MG_ENABLED']) {
+                            $mgIface = new MegogoInterface();
+                            $mgQueueProcessingResult = $mgIface->scheduleProcessing();
+                            die($mgQueueProcessingResult);
+                        } else {
+                            die('ERROR: MEGOGO DISABLED');
+                        }
+                    }
+
+                    //Megogo fee processing (monthly)
+                    if ($_GET['action'] == 'mgprocessing') {
+                        if ($alterconf['MG_ENABLED']) {
+                            $mgIface = new MegogoInterface();
+                            $mgFeeProcessingResult = $mgIface->subscriptionFeeProcessing();
+                            die($mgFeeProcessingResult);
+                        } else {
+                            die('ERROR: MEGOGO DISABLED');
+                        }
+                    }
+
+                    //existential horse
+                    if ($_GET['action'] == 'exhorse') {
+                        if ($alterconf['EXHORSE_ENABLED']) {
+                            if (date("d")==date("t")) {
+                                $exhorse = new ExistentialHorse();
+                                $exhorse->runHorse();
+                            }
+                            die('OK: EXHORSE');
+                        } else {
+                            die('ERROR: EXHORSE DISABLED');
+                        }
+                    }
+
+
+
                     ////
                     //// End of actions
                     ////

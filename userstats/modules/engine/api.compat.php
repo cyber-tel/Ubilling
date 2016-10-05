@@ -59,7 +59,7 @@ if ($statsconfig['auth'] == 'login') { //if enabled login based auth
 //mark announcements as read/unread
 if (isset($_GET['anmarkasread'])) {
     $anReadId = vf($_GET['anmarkasread']);
-    setcookie("zbsanread_" . $anReadId, $anReadId, time() + 2592000);
+    setcookie("zbsanread_" . $anReadId, $anReadId, time() + 31104000);
     rcms_redirect('?module=announcements');
 }
 if (isset($_GET['anmarkasunread'])) {
@@ -293,6 +293,9 @@ function zbs_DownloadFile($filePath, $contentType = '') {
             header('Content-Type: application/octet-stream');
             header("Content-Transfer-Encoding: Binary");
             header("Content-disposition: attachment; filename=\"" . basename($filePath) . "\"");
+            header("Content-Description: File Transfer");
+            header("Content-Length: " . filesize($filePath));
+            
             die($fileContent);
         } else {
             throw new Exception('DOWNLOAD_FILEPATH_NOT_EXISTS');

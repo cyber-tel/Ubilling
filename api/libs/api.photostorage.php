@@ -16,6 +16,14 @@ class PhotoStorage {
     const EX_NOSCOPE = 'NO_OBJECT_SCOPE_SET';
     const EX_WRONG_EXT = 'WRONG_FILE_EXTENSION';
 
+    /**
+     * Initializes photostorage engine for some scope/item id
+     * 
+     * @param string $scope
+     * @param string $itemid
+     * 
+     * @return void
+     */
     public function __construct($scope = '', $itemid = '') {
         $this->loadConfig();
         $this->loadAlter();
@@ -134,8 +142,10 @@ class PhotoStorage {
         $result = wf_tag('br');
         $downloadUrl = self::MODULE_URL . '&scope=' . $this->scope . '&itemid=' . $this->itemId . '&download=' . $imageId;
         $result.= wf_Link($downloadUrl, wf_img('skins/icon_download.png', __('Download')), false, '');
-        $deleteUrl = self::MODULE_URL . '&scope=' . $this->scope . '&itemid=' . $this->itemId . '&delete=' . $imageId;
-        $result.= wf_AjaxLink($deleteUrl, web_delete_icon(), 'ajRefCont_' . $imageId, false, '');
+        if (cfr('PHOTOSTORAGEDELETE')) {
+            $deleteUrl = self::MODULE_URL . '&scope=' . $this->scope . '&itemid=' . $this->itemId . '&delete=' . $imageId;
+            $result.= wf_AjaxLink($deleteUrl, web_delete_icon(), 'ajRefCont_' . $imageId, false, '');
+        }
         return ($result);
     }
 
@@ -167,6 +177,15 @@ class PhotoStorage {
         }
         if ($this->scope == 'CUSTMAPSITEMS') {
             $result = wf_Link('?module=custmaps&edititem=' . $this->itemId, __('Back'), false, 'ubButton');
+        }
+        if ($this->scope == 'WAREHOUSEITEMTYPE') {
+            $result = wf_Link('?module=warehouse&itemtypes=true', __('Back'), false, 'ubButton');
+        }
+        if ($this->scope == 'TASKMAN') {
+            $result = wf_Link('?module=taskman&edittask=' . $this->itemId, __('Back'), false, 'ubButton');
+        }
+        if ($this->scope == 'UKVUSERPROFILE') {
+            $result = wf_Link('?module=ukv&users=true&showuser=' . $this->itemId, __('Back'), false, 'ubButton');
         }
         return ($result);
     }
@@ -211,6 +230,35 @@ class PhotoStorage {
     }
 
     /**
+     * Returns list of available images for current scope/item
+     * 
+     * @return string
+     */
+    public function renderImagesRaw() {
+        $result = '';
+        if (empty($this->allimages)) {
+            $this->loadAllImages();
+        }
+        if (!empty($this->allimages)) {
+            foreach ($this->allimages as $io => $eachimage) {
+                if (($eachimage['scope'] == $this->scope) AND ( $eachimage['item'] == $this->itemId)) {
+                    $imgPreview = wf_img_sized(self::STORAGE_PATH . $eachimage['filename'], __('Show'), $this->photoCfg['IMGLIST_PREV_W'], $this->photoCfg['IMGLIST_PREV_H']);
+                    $imgFull = wf_img(self::STORAGE_PATH . $eachimage['filename']);
+
+                    $dimensions = 'width:' . ($this->photoCfg['IMGLIST_PREV_W'] + 10) . 'px;';
+                    $dimensions.='height:' . ($this->photoCfg['IMGLIST_PREV_H'] + 10) . 'px;';
+
+                    $result.=wf_modalAuto($imgPreview, __('Image') . ' ' . $eachimage['id'], $imgFull, '');
+                }
+            }
+        }
+
+
+        $result.= wf_CleanDiv();
+        return ($result);
+    }
+
+    /**
      * Downloads image file by its id
      * 
      * @param int $id database image ID
@@ -245,9 +293,13 @@ class PhotoStorage {
         if (!empty($id)) {
             @$filename = $this->allimages[$id]['filename'];
             if (file_exists(self::STORAGE_PATH . $filename)) {
-                unlink(self::STORAGE_PATH . $filename);
-                $this->unregisterImage($id);
-                $deleteResult = wf_tag('span', false, 'alert_warning') . __('Deleted') . wf_tag('span', true);
+                if (cfr('PHOTOSTORAGEDELETE')) {
+                    unlink(self::STORAGE_PATH . $filename);
+                    $this->unregisterImage($id);
+                    $deleteResult = wf_tag('span', false, 'alert_warning') . __('Deleted') . wf_tag('span', true);
+                } else {
+                    $deleteResult = wf_tag('span', false, 'alert_error') . __('Access denied') . wf_tag('span', true);
+                }
             } else {
                 $deleteResult = wf_tag('span', false, 'alert_error') . __('File not exist') . wf_tag('span', true);
             }

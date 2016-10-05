@@ -6,16 +6,82 @@
 
 class UkvSystem {
 
+    /**
+     * Available tariffs as id=>data
+     *
+     * @var array
+     */
     protected $tariffs = array();
+
+    /**
+     * Available users and therir data as id=>data
+     *
+     * @var array
+     */
     protected $users = array();
+
+    /**
+     * Available cities from directory
+     *
+     * @var array
+     */
     protected $cities = array('' => '-');
+
+    /**
+     * Available streets from directory
+     *
+     * @var array
+     */
     protected $streets = array('' => '-');
+
+    /**
+     * Available system cashtypes
+     *
+     * @var array
+     */
     protected $cashtypes = array();
+
+    /**
+     * Default month array with localized names
+     * 
+     * @var array
+     */
     protected $month = array();
+
+    /**
+     * Currently assigned users contracts as contract=>userid
+     *
+     * @var array
+     */
     protected $contracts = array();
+
+    /**
+     * Preprocessed banksta records
+     *
+     * @var array
+     */
     protected $bankstarecords = array();
+
+    /**
+     * Some magic goes here
+     *
+     * @var array
+     */
     protected $bankstafoundusers = array();
+
+    /**
+     * System alter.ini config represented as key=>value
+     *
+     * @var array
+     */
     protected $altCfg = array();
+
+    /**
+     * System message helper object placeholder
+     *
+     * @var object
+     */
+    protected $messages = '';
 
     //static routing URLs
 
@@ -32,6 +98,7 @@ class UkvSystem {
     const URL_BANKSTA_DETAILED = '?module=ukv&banksta=true&showdetailed='; //detailed banksta row display url
     const URL_REPORTS_LIST = '?module=ukv&reports=true&showreport=reportList'; //reports listing link
     const URL_REPORTS_MGMT = '?module=ukv&reports=true&showreport='; //reports listing link
+    const URL_PHOTOSTORAGE = '?module=photostorage&scope=UKVUSERPROFILE&mode=list&itemid='; //photostorage link
     //registration options
     const REG_ACT = 1;
     const REG_CASH = 0;
@@ -89,6 +156,7 @@ class UkvSystem {
         $this->loadStreets();
         $this->loadMonth();
         $this->loadDebtLimit();
+        $this->initMessages();
     }
 
     /**
@@ -183,10 +251,19 @@ class UkvSystem {
      * 
      * @return void
      */
-    function loadDebtLimit() {
+    protected function loadDebtLimit() {
         global $ubillingConfig;
         $altCfg = $ubillingConfig->getAlter();
         $this->debtLimit = $altCfg['UKV_MONTH_DEBTLIMIT'];
+    }
+
+    /**
+     * Inits message helper object for further usage
+     * 
+     * @return void
+     */
+    protected function initMessages() {
+        $this->messages = new UbillingMessageHelper();
     }
 
     /**
@@ -556,7 +633,7 @@ class UkvSystem {
      * 
      * @return string
      */
-    protected function userGetFullAddress($userid) {
+    public function userGetFullAddress($userid) {
         if (isset($this->users[$userid])) {
             global $ubillingConfig;
             $altcfg = $ubillingConfig->getAlter();
@@ -573,6 +650,22 @@ class UkvSystem {
                 $city = '';
             }
             $result = $city . $this->users[$userid]['street'] . ' ' . $this->users[$userid]['build'] . $apt;
+        } else {
+            $result = '';
+        }
+        return ($result);
+    }
+
+    /**
+     * Returns existing tariff name by tariffid
+     * 
+     * @param int  $tariffid
+     * 
+     * @return string
+     */
+    public function tariffGetName($tariffid) {
+        if ($this->tariffs[$tariffid]['tariffname']) {
+            $result = $this->tariffs[$tariffid]['tariffname'];
         } else {
             $result = '';
         }
@@ -810,7 +903,10 @@ class UkvSystem {
 
             $inputs = wf_TableBody($inputs, '800', 0, '');
 
+
             $result = wf_Form('', 'POST', $inputs, 'ukvusereditform');
+
+
 
             return ($result);
         }
@@ -1050,27 +1146,45 @@ class UkvSystem {
      * @return string
      */
     public function userProfile($userid) {
-        global $ubillingConfig;
-        $altcfg = $ubillingConfig->getAlter();
         $userid = vf($userid, 3);
         if (isset($this->users[$userid])) {
             $userData = $this->users[$userid];
             $rows = '';
 
             //zero apt numbers as private builds
-            if ($altcfg['ZERO_TOLERANCE']) {
+            if ($this->altCfg['ZERO_TOLERANCE']) {
                 $apt = ($userData['apt'] == '0') ? '' : '/' . $userData['apt'];
             } else {
                 $apt = '/' . $userData['apt'];
             }
 
+            //photostorage integration
+            if ($this->altCfg['PHOTOSTORAGE_ENABLED']) {
+                $photoControl = wf_Link(self::URL_PHOTOSTORAGE . $userid, wf_img_sized('skins/photostorage.png', __('Upload images'), '10'), false);
+            } else {
+                $photoControl = '';
+            }
 
-            $cells = wf_TableCell(__('Full address'), '20%', 'row2');
+            //additional user comments
+            if ($this->altCfg['ADCOMMENTS_ENABLED']) {
+                $adcomments = new ADcomments('UKVUSERPROFILE');
+            }
+
+            //task creation control
+            if ($this->altCfg['CREATETASK_IN_PROFILE']) {
+                $shortAddress = $userData['street'] . ' ' . $userData['build'] . $apt;
+                $taskForm = ts_TaskCreateFormUnified($shortAddress, $userData['mobile'], $userData['phone'], '');
+                $taskControl = wf_modal(wf_img('skins/createtask.gif', __('Create task')), __('Create task'), $taskForm, '', '420', '500');
+            } else {
+                $taskControl = '';
+            }
+
+            $cells = wf_TableCell(__('Full address') . ' ' . $taskControl, '20%', 'row2');
             $cells.= wf_TableCell($userData['city'] . ' ' . $userData['street'] . ' ' . $userData['build'] . $apt);
             $rows.= wf_TableRow($cells, 'row3');
 
 
-            $cells = wf_TableCell(__('Real Name'), '20%', 'row2');
+            $cells = wf_TableCell(__('Real Name') . ' ' . $photoControl, '20%', 'row2');
             $cells.= wf_TableCell($userData['realname']);
             $rows.= wf_TableRow($cells, 'row3');
 
@@ -1144,6 +1258,13 @@ class UkvSystem {
 
             $result = wf_TableBody($profilerows, '100%', '0');
             $result.= $this->userPaymentsRender($userid);
+
+
+            //additional user comments
+            if ($this->altCfg['ADCOMMENTS_ENABLED']) {
+                $result.=wf_tag('h3') . __('Additional comments') . wf_tag('h3', true);
+                $result.=$adcomments->renderComments($userid);
+            }
 
             return ($result);
         } else {
@@ -1985,6 +2106,11 @@ class UkvSystem {
         $reports.= $this->buildReportTask(self::URL_REPORTS_MGMT . 'reportSignup', 'signupreport.jpg', __('Signup report'));
         $reports.= $this->buildReportTask(self::URL_REPORTS_MGMT . 'reportFees', 'feesreport.png', __('Money fees'));
         $reports.= $this->buildReportTask(self::URL_REPORTS_MGMT . 'reportStreets', 'streetsreport.png', __('Streets report'));
+        $reports.= $this->buildReportTask(self::URL_REPORTS_MGMT . 'reportDebtAddr', 'debtaddr.png', __('Current debtors for delivery by address'));
+        $reports.= $this->buildReportTask(self::URL_REPORTS_MGMT . 'reportDebtStreets', 'debtstreets.png', __('Current debtors for delivery by streets'));
+        if ($this->altCfg['COMPLEX_ENABLED']) {
+            $reports.= $this->buildReportTask(self::URL_REPORTS_MGMT . 'reportComplexAssign', 'reportcomplexassign.png', __('Users with complex services'));
+        }
         $reports.=wf_CleanDiv();
         show_window(__('Reports'), $reports);
     }
@@ -2027,6 +2153,142 @@ class UkvSystem {
         $data = str_replace($disconnectedMask, wf_tag('b') . __('Disconnected') . wf_tag('b', true), $data);
 
         die($data);
+    }
+
+    /**
+     * Renders debtors notifications by address selection
+     * 
+     * 
+     * @return void
+     */
+    public function reportDebtAddr() {
+        if (wf_CheckGet(array('aj_rdabuildsel'))) {
+            if (!empty($_GET['aj_rdabuildsel'])) {
+                $streetId = base64_decode($_GET['aj_rdabuildsel']);
+                if ($streetId != '-') {
+                    $buildParams = array();
+                    if (!empty($this->users)) {
+                        foreach ($this->users as $io => $each) {
+                            if ($each['street'] == $streetId) {
+                                $buildParams[$each['build']] = $each['build'];
+                            }
+                        }
+                        natsort($buildParams);
+                    }
+                    $buildInputs = wf_Selector('buildsel', $buildParams, __('Build'), '', true);
+                    $buildInputs.= wf_HiddenInput('streetsel', $streetId);
+                    $buildInputs.= wf_TextInput('debtcash', __('The threshold at which the money considered user debtor'), '0', true, 4);
+                    $buildInputs.= wf_Submit(__('Print'));
+                    die($buildInputs);
+                } else {
+                    die('');
+                }
+            }
+        }
+
+        if (!wf_CheckPost(array('buildsel', 'streetsel'))) {
+            $streetData = array();
+            if (!empty($this->streets)) {
+                foreach ($this->streets as $streetId => $eachStreetName) {
+                    $streetId = base64_encode($eachStreetName);
+                    $streetData[self::URL_REPORTS_MGMT . 'reportDebtAddr' . '&aj_rdabuildsel=' . $streetId] = $eachStreetName;
+                }
+            }
+
+            $inputs = wf_AjaxLoader();
+            $inputs.= wf_AjaxSelectorAC('aj_buildcontainer', $streetData, __('Street'), '', false);
+            $inputs.= wf_AjaxContainer('aj_buildcontainer');
+
+            $form = wf_Form('', 'POST', $inputs, 'glamour');
+            show_window(__('Current debtors for delivery by address'), $form);
+        } else {
+            $searchBuild = mysql_real_escape_string($_POST['buildsel']);
+            $searchStreet = mysql_real_escape_string($_POST['streetsel']);
+            $debtCash = (wf_CheckPost(array('debtcash'))) ? ('-' . vf($_POST['debtcash'], 3)) : 0;
+            $query = "SELECT * from `ukv_users` WHERE `cash`<'" . $debtCash . "' AND `street`='" . $searchStreet . "' AND `build`='" . $searchBuild . "' AND `active`='1' ORDER BY `street`";
+            $allDebtors = simple_queryall($query);
+            $rawTemplate = file_get_contents(CONFIG_PATH . "catv_debtors.tpl");
+            $printableTemplate = '';
+            if (!empty($allDebtors)) {
+                foreach ($allDebtors as $io => $each) {
+                    $rowtemplate = $rawTemplate;
+                    $rowtemplate = str_ireplace('{REALNAME}', $each['realname'], $rowtemplate);
+                    $rowtemplate = str_ireplace('{STREET}', $each['street'], $rowtemplate);
+                    $rowtemplate = str_ireplace('{BUILD}', $each['build'], $rowtemplate);
+                    $rowtemplate = str_ireplace('{APT}', $each['apt'], $rowtemplate);
+                    $rowtemplate = str_ireplace('{DEBT}', $each['cash'], $rowtemplate);
+                    $rowtemplate = str_ireplace('{CURDATE}', curdate(), $rowtemplate);
+                    $rowtemplate = str_ireplace('{PAYDAY}', (date("Y-m-") . '01'), $rowtemplate);
+                    $printableTemplate.=$rowtemplate;
+                }
+                $printableTemplate = wf_TableBody($printableTemplate, '100%', 0, 'sortable');
+                $printableTemplate = $this->reportPrintable(__('Current debtors for delivery by address'), $printableTemplate);
+            } else {
+                show_window('', $this->messages->getStyledMessage(__('Nothing found'), 'info'));
+            }
+        }
+    }
+
+    /**
+     * Renders debtors notifications by address selection
+     * 
+     * 
+     * @return void
+     */
+    public function reportDebtStreets() {
+        if (wf_CheckGet(array('aj_rdabuildsel'))) {
+            if (!empty($_GET['aj_rdabuildsel'])) {
+                $streetId = base64_decode($_GET['aj_rdabuildsel']);
+                $buildInputs = wf_HiddenInput('streetsel', $streetId);
+                $buildInputs.= wf_TextInput('debtcash', __('The threshold at which the money considered user debtor'), '0', true, 4);
+                $buildInputs.= wf_Submit(__('Print'));
+                die($buildInputs);
+            } else {
+                die('');
+            }
+        }
+
+
+        if (!wf_CheckPost(array('streetsel'))) {
+            $streetData = array();
+            if (!empty($this->streets)) {
+                foreach ($this->streets as $streetId => $eachStreetName) {
+                    $streetId = base64_encode($eachStreetName);
+                    $streetData[self::URL_REPORTS_MGMT . 'reportDebtStreets' . '&aj_rdabuildsel=' . $streetId] = $eachStreetName;
+                }
+            }
+
+            $inputs = wf_AjaxLoader();
+            $inputs.= wf_AjaxSelectorAC('aj_buildcontainer', $streetData, __('Street'), '', false);
+            $inputs.= wf_AjaxContainer('aj_buildcontainer');
+
+            $form = wf_Form('', 'POST', $inputs, 'glamour');
+            show_window(__('Current debtors for delivery by streets'), $form);
+        } else {
+            $searchStreet = mysql_real_escape_string($_POST['streetsel']);
+            $debtCash = (wf_CheckPost(array('debtcash'))) ? ('-' . vf($_POST['debtcash'], 3)) : 0;
+            $query = "SELECT * from `ukv_users` WHERE `cash`<'" . $debtCash . "' AND `street`='" . $searchStreet . "'  AND `active`='1' ORDER BY `build`";
+            $allDebtors = simple_queryall($query);
+            $rawTemplate = file_get_contents(CONFIG_PATH . "catv_debtors.tpl");
+            $printableTemplate = '';
+            if (!empty($allDebtors)) {
+                foreach ($allDebtors as $io => $each) {
+                    $rowtemplate = $rawTemplate;
+                    $rowtemplate = str_ireplace('{REALNAME}', $each['realname'], $rowtemplate);
+                    $rowtemplate = str_ireplace('{STREET}', $each['street'], $rowtemplate);
+                    $rowtemplate = str_ireplace('{BUILD}', $each['build'], $rowtemplate);
+                    $rowtemplate = str_ireplace('{APT}', $each['apt'], $rowtemplate);
+                    $rowtemplate = str_ireplace('{DEBT}', $each['cash'], $rowtemplate);
+                    $rowtemplate = str_ireplace('{CURDATE}', curdate(), $rowtemplate);
+                    $rowtemplate = str_ireplace('{PAYDAY}', (date("Y-m-") . '01'), $rowtemplate);
+                    $printableTemplate.=$rowtemplate;
+                }
+                $printableTemplate = wf_TableBody($printableTemplate, '100%', 0, 'sortable');
+                $printableTemplate = $this->reportPrintable(__('Current debtors for delivery by streets'), $printableTemplate);
+            } else {
+                show_window('', $this->messages->getStyledMessage(__('Nothing found'), 'info'));
+            }
+        }
     }
 
     /**
@@ -2217,9 +2479,10 @@ class UkvSystem {
                     $result.=wf_tag('h2') . __('Tariff') . ': ' . $tariffArr[$tariffSearch] . wf_tag('h2', true);
                     $cells = wf_TableCell(__('Contract'), '10%');
                     $cells.= wf_TableCell(__('Full address'), '31%');
-                    $cells.= wf_TableCell(__('Real Name'), '30%');
+                    $cells.= wf_TableCell(__('Real Name'), '25%');
                     $cells.= wf_TableCell(__('Tariff'), '15%');
                     $cells.= wf_TableCell(__('Cash'), '7%');
+                    $cells.= wf_TableCell(__('Seal'), '5%');
                     $cells.= wf_TableCell(__('Status'), '7%');
                     $rows = wf_TableRow($cells, 'row1');
 
@@ -2231,6 +2494,7 @@ class UkvSystem {
                         $cells.= wf_TableCell($eachUser['realname']);
                         $cells.= wf_TableCell($this->tariffs[$eachUser['tariffid']]['tariffname']);
                         $cells.= wf_TableCell($eachUser['cash']);
+                        $cells.= wf_tablecell($eachUser['cableseal']);
                         $cells.= wf_TableCell(web_bool_led($eachUser['active'], true));
                         $rows.= wf_TableRow($cells, 'row3');
                     }
@@ -2785,9 +3049,10 @@ class UkvSystem {
 
                 $cells = wf_TableCell(__('Contract'), '10%');
                 $cells.= wf_TableCell(__('Full address'), '31%');
-                $cells.= wf_TableCell(__('Real Name'), '30%');
+                $cells.= wf_TableCell(__('Real Name'), '25%');
                 $cells.= wf_TableCell(__('Tariff'), '15%');
                 $cells.= wf_TableCell(__('Cash'), '7%');
+                $cells.= wf_TableCell(__('Seal'), '5%');
                 $cells.= wf_TableCell(__('Status'), '7%');
                 $rows = wf_TableRow($cells, 'row1');
 
@@ -2800,6 +3065,7 @@ class UkvSystem {
                         $cells.= wf_TableCell($eachUser['realname']);
                         $cells.= wf_TableCell($this->tariffs[$eachUser['tariffid']]['tariffname']);
                         $cells.= wf_TableCell($eachUser['cash']);
+                        $cells.= wf_TableCell($eachUser['cableseal']);
                         $cells.= wf_TableCell(web_bool_led($eachUser['active'], true));
                         $rows.= wf_TableRow($cells, 'row3');
                         $counter++;
@@ -2817,6 +3083,127 @@ class UkvSystem {
             } else {
                 show_window(__('Result'), __('Any users found'));
             }
+        }
+    }
+
+    /**
+     * Renders complex users assign forms or something like that.
+     * 
+     * @return void
+     */
+    public function reportComplexAssign() {
+        $nologinUsers = array();
+        $ukvContracts = array();
+        $inetContracts = array();
+        $contractCfId = '';
+
+        //updating inet login if required
+        if (wf_CheckPost(array('assignComplexLogin', 'assignComplexUkvId'))) {
+            $updateUserId = vf($_POST['assignComplexUkvId'], 3);
+            $updateInetLogin = $_POST['assignComplexLogin'];
+            if ($this->users[$updateUserId]['inetlogin'] != $updateInetLogin) {
+                simple_update_field('ukv_users', 'inetlogin', $updateInetLogin, "WHERE `id`='" . $updateUserId . "';");
+                log_register('UKV USER ((' . $updateUserId . ')) ASSIGN INETLOGIN `' . $updateInetLogin . '`');
+                rcms_redirect(self::URL_REPORTS_MGMT . 'reportComplexAssign');
+            }
+        }
+
+        $allInetUsers = zb_UserGetAllStargazerDataAssoc();
+        $allAddress = zb_AddressGetFulladdresslistCached();
+        $allRealNames = zb_UserGetAllRealnames();
+
+        //preparing ukv users
+        if (!empty($this->users)) {
+            foreach ($this->users as $io => $each) {
+                if (empty($each['inetlogin'])) {
+                    $nologinUsers[$each['id']] = $each;
+                    $ukvContracts[$each['contract']] = $each['id'];
+                }
+            }
+        }
+        //getting complex contract CF id
+        if (!empty($this->altCfg['COMPLEX_CFIDS'])) {
+            $cfDataRaw = $this->altCfg['COMPLEX_CFIDS'];
+            $cfData = explode(',', $cfDataRaw);
+            $contractCfId = (isset($cfData[0])) ? vf($cfData[0], 3) : '';
+        }
+
+        //prepare cf logins=>contract pairs
+        if (!empty($contractCfId)) {
+            $query = "SELECT `login`,`content` from `cfitems` WHERE `typeid`='" . $contractCfId . "' AND `content` IS NOT NULL;";
+            $rawCfs = simple_queryall($query);
+            if (!empty($rawCfs)) {
+                foreach ($rawCfs as $io => $each) {
+                    $inetContracts[$each['login']] = $each['content'];
+                }
+            }
+        }
+
+        //rendering main form
+        if (!empty($inetContracts)) {
+            $cells = wf_TableCell(__('Full address'));
+            $cells.= wf_TableCell(__('Real Name'));
+            $cells.= wf_TableCell(__('Tariff'));
+            $cells.= wf_TableCell(__('Contract'));
+            $cells.= wf_TableCell(__('Login'));
+            $cells.= wf_TableCell(__('Full address'));
+            $cells.= wf_TableCell(__('Real Name'));
+            $cells.= wf_TableCell(__('Actions'));
+            $rows = wf_TableRow($cells, 'row1');
+
+            foreach ($inetContracts as $login => $contract) {
+                if (isset($allInetUsers[$login])) {
+                    if (!empty($contract)) {
+                        @$ukvUserId = $ukvContracts[$contract];
+                        if (!empty($ukvUserId)) {
+                            if (isset($nologinUsers[$ukvUserId])) {
+                                $ukvRealname = @$this->users[$ukvUserId]['realname'];
+                                $inetRealname = @$allRealNames[$login];
+                                $ukvAddress = $this->userGetFullAddress($ukvUserId);
+                                $inetAddress = @$allAddress[$login];
+
+                                $catvLink = wf_link(self::URL_USERS_PROFILE . $ukvUserId, web_profile_icon() . ' ' . $ukvAddress);
+                                $cells = wf_TableCell($catvLink);
+                                $cells.= wf_TableCell($ukvRealname);
+                                $cells.= wf_TableCell(@$this->tariffs[$this->users[$ukvUserId]['tariffid']]['tariffname']);
+                                $cells.= wf_TableCell($contract);
+                                $profileLink = wf_Link('?module=userprofile&username=' . $login, web_profile_icon() . ' ' . $login, false);
+                                $cells.= wf_TableCell($profileLink);
+                                $cells.= wf_TableCell($inetAddress);
+                                $cells.= wf_TableCell($inetRealname);
+                                $assignInputs = wf_HiddenInput('assignComplexLogin', $login);
+                                $assignInputs.= wf_HiddenInput('assignComplexUkvId', $ukvUserId);
+                                $assignInputs.= wf_Submit(__('Assign'));
+                                $assignContols = wf_Form('', 'POST', $assignInputs, '');
+                                $cells.= wf_TableCell($assignContols);
+
+                                $rowclass = 'row3';
+                                //coloring results
+                                if ((!empty($ukvRealname)) AND ( !empty($inetRealname))) {
+                                    $ukvNameTmp = explode(' ', $ukvRealname);
+                                    $inetNameTmp = explode(' ', $inetRealname);
+
+                                    if (@$ukvNameTmp[0] == @$inetNameTmp[0]) {
+                                        $rowclass = 'ukvassignnamerow';
+                                    }
+                                    
+                                    if ((!empty($inetAddress)) AND (!empty($ukvAddress))) {
+                                       if (($inetAddress==$ukvAddress) AND (@$ukvNameTmp[0] == @$inetNameTmp[0])) {
+                                           $rowclass = 'ukvassignaddrrow';
+                                       }
+                                    }
+                                }
+                                
+                                
+                                $rows.= wf_TableRow($cells, $rowclass);
+                            }
+                        }
+                    }
+                }
+            }
+
+            $result = wf_TableBody($rows, '100%', 0, 'sortable');
+            show_window(__('Assign UKV users to complex profiles'), $result);
         }
     }
 

@@ -166,24 +166,18 @@ if ($altcfg['ASKOZIA_ENABLED']) {
                     $sessionTimeStats.=$startTime;
                     $sessionTimeStats.=wf_tag('abbr', true);
                     $callDirection = '';
-
-                    //detectiong direction icon
-                    if (!empty($customCfg)) {
-                        if ((isset($customCfg[0])) AND ( $customCfg[1])) {
-                            if (zb_AskoziaCheckPrefix($customCfg[0], $each[1])) {
-                                $callDirection = wf_img('skins/calls/outgoing.png') . ' ';
-                            }
-
-                            if (zb_AskoziaCheckPrefix($customCfg[1], $each[1])) {
-                                $callDirection = wf_img('skins/calls/incoming.png') . ' ';
-                            }
-                        }
+                    if ($each[16] == 'outbound') {
+                        $toNumber = $each[2];
+                        $callDirection = wf_img('skins/calls/outgoing.png') . ' ';
+                    } else {
+                        $toNumber = $each[18];
+                        $callDirection = wf_img('skins/calls/incoming.png') . ' ';
                     }
 
                     $cells = wf_TableCell(wf_modal($callsCounter, $callsCounter, $debugData, '', '500', '600'), '', '', 'sorttable_customkey="' . $callsCounter . '"');
                     $cells.= wf_TableCell($callDirection . $sessionTimeStats, '', '', 'sorttable_customkey="' . strtotime($each[9]) . '"');
                     $cells.= wf_TableCell(zb_AskoziaGetNumAlias($each[1]));
-                    $cells.= wf_TableCell(zb_AskoziaGetNumAlias($each[2]));
+                    $cells.= wf_TableCell(zb_AskoziaGetNumAlias($toNumber));
                     $receiveCid = '';
                     if (!empty($each[6])) {
                         $tmpRcid = explode('-', $each[6]);
@@ -219,7 +213,10 @@ if ($altcfg['ASKOZIA_ENABLED']) {
                     if (ispos($each[14], 'NO ANSWER')) {
                         $callStatus = __('No answer');
                         $statusIcon = wf_img('skins/calls/phone_red.png');
-                        $noAnswerCounter++;
+                        //only incoming calls is unanswered
+                        if ($each[16] != 'outbound') {
+                            $noAnswerCounter++;
+                        }
                         if (isset($chartData[$startDate . ' ' . $startHour]['noanswer'])) {
                             $chartData[$startDate . ' ' . $startHour]['noanswer'] ++;
                         } else {
@@ -321,7 +318,7 @@ if ($altcfg['ASKOZIA_ENABLED']) {
             $result.=__('Total calls') . ': ' . $callsCounter;
 
             if (!empty($customCfg)) {
-                @$result.=wf_delimiter() . wf_TableBody($grows, '100%', '0', 'sortable').  wf_delimiter();
+                @$result.=wf_delimiter() . wf_TableBody($grows, '100%', '0', 'sortable') . wf_delimiter();
             }
 
             $result.=wf_TableBody($rows, '100%', '0', 'sortable');

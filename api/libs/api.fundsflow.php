@@ -2,11 +2,38 @@
 
 class FundsFlow {
 
+    /**
+     * Contains system alter config as key=>value
+     *
+     * @var array
+     */
     protected $alterConf = array();
+
+    /**
+     * Contains main billing config as key=>value
+     *
+     * @var array
+     */
     protected $billingConf = array();
+
+    /**
+     * Contains all of available user data as login=>userdata
+     *
+     * @var array
+     */
+    protected $allUserData = array();
+
+    /**
+     * Contains available tariffs data as tariffname=>data
+     *
+     * @var array
+     */
+    protected $allTariffsData = array();
+    protected $fundsTmp = array();
 
     public function __construct() {
         $this->loadConfigs();
+        $this->initTmp();
     }
 
     /**
@@ -21,9 +48,47 @@ class FundsFlow {
     }
 
     /**
+     * Inits tmp data with empty values
+     * 
+     * @return void
+     */
+    protected function initTmp() {
+        $this->fundsTmp['col1'] = 0;
+        $this->fundsTmp['col2'] = 0;
+        $this->fundsTmp['col3'] = 0;
+        $this->fundsTmp['col4'] = 0;
+    }
+
+    /**
+     * Loads all of available users data as login=>array
+     * 
+     * @return void
+     */
+    protected function loadAllUserData() {
+        $query = "SELECT * from `users`";
+        $all = simple_queryall($query);
+        if (!empty($all)) {
+            foreach ($all as $io => $each) {
+                $this->allUserData[$each['login']] = $each;
+            }
+        }
+    }
+
+    protected function loadAllTariffsData() {
+        $query = "SELECT * from `tariffs`";
+        $all = simple_queryall($query);
+        if (!empty($all)) {
+            foreach ($all as $io => $each) {
+                $this->allTariffsData[$each['name']] = $each;
+            }
+        }
+    }
+
+    /**
      * Returns array of fees by some login with parsing it from stargazer log
      * 
      * @param string $login existing user login
+     * 
      * @return array
      */
     public function getFees($login) {
@@ -74,6 +139,7 @@ class FundsFlow {
      * Returns array of all payments by some user 
      * 
      * @param string $login existing user login
+     * 
      * @return array
      */
     public function getPayments($login) {
@@ -275,6 +341,7 @@ class FundsFlow {
      * 
      * @param array  $fundsflow standard fundsflow array
      * @param string $date
+     * 
      * @return array
      */
     public function filterByDate($fundsflow, $date) {
@@ -298,6 +365,7 @@ class FundsFlow {
      * @param array $corpUsers
      * @param array $allUserTariffs
      * @param array $allUserContracts
+     * 
      * @return string
      */
     public function renderCorpsFlows($num, $fundsFlows, $corpsData, $corpUsers, $allUserContracts, $allUsersCash, $allUserTariffs, $allTariffPrices) {
@@ -314,6 +382,12 @@ class FundsFlow {
         $rawData['balance'] = 0;
         $rawData['used'] = 0;
 
+        //cemetery dead-hide processing
+        $ignoreArr = array();
+        if ($this->alterConf['CEMETERY_ENABLED']) {
+            $cemetery = new Cemetery();
+            $ignoreArr = $cemetery->getAllTagged();
+        }
 
 
         if (!empty($fundsFlows)) {
@@ -333,28 +407,57 @@ class FundsFlow {
 
 
             $rawData['login'] = $eachop['login'];
-            @$rawData['contract'] = array_search($eachop['login'], $allUserContracts);
-            @$rawData['corpid'] = $corpUsers[$eachop['login']];
-            @$rawData['corpname'] = $corpsData[$rawData['corpid']]['corpname'];
-            $rawData['balance'] = $allUsersCash[$eachop['login']];
-            $rawData['used'] = $rawData['fees'];
+            if (!isset($ignoreArr[$rawData['login']])) {
+                @$rawData['contract'] = array_search($eachop['login'], $allUserContracts);
+                @$rawData['corpid'] = $corpUsers[$eachop['login']];
+                @$rawData['corpname'] = $corpsData[$rawData['corpid']]['corpname'];
+                $rawData['balance'] = $allUsersCash[$eachop['login']];
+                $rawData['used'] = $rawData['fees'];
 
-            //forming result
-            $cells = wf_TableCell($num);
-            $corpLink = wf_Link('?module=corps&show=corps&editid=' . $rawData['corpid'], $rawData['corpname'], false, '');
-            $cells.=wf_TableCell($corpLink);
-            if ($rawData['contract']) {
-                $loginLink = wf_Link('?module=userprofile&username=' . $rawData['login'], $rawData['contract'], false, '');
-            } else {
-                $loginLink = wf_Link('?module=userprofile&username=' . $rawData['login'], $rawData['login'], false, '');
+                //forming result
+                $cells = wf_TableCell($num);
+                $corpLink = wf_Link('?module=corps&show=corps&editid=' . $rawData['corpid'], $rawData['corpname'], false, '');
+                $cells.=wf_TableCell($corpLink);
+                if ($rawData['contract']) {
+                    $loginLink = wf_Link('?module=userprofile&username=' . $rawData['login'], $rawData['contract'], false, '');
+                } else {
+                    $loginLink = wf_Link('?module=userprofile&username=' . $rawData['login'], $rawData['login'], false, '');
+                }
+                $cells.=wf_TableCell($loginLink);
+                $cells.=wf_TableCell(@$allTariffPrices[$allUserTariffs[$rawData['login']]]);
+                $cells.=wf_TableCell(round($rawData['payments'], 2));
+                $cells.=wf_TableCell(round($rawData['paymentscorr'], 2));
+                $cells.=wf_TableCell(round($rawData['balance'], 2));
+                $cells.=wf_TableCell(round($rawData['used'], 2));
+                $result.=wf_TableRow($cells, 'row3');
+
+                //fill summary data
+                $this->fundsTmp['col1']+= $rawData['payments'];
+                $this->fundsTmp['col2']+= $rawData['paymentscorr'];
+                $this->fundsTmp['col3']+= $rawData['balance'];
+                $this->fundsTmp['col4']+= $rawData['used'];
             }
-            $cells.=wf_TableCell($loginLink);
-            $cells.=wf_TableCell(@$allTariffPrices[$allUserTariffs[$rawData['login']]]);
-            $cells.=wf_TableCell(round($rawData['payments'], 2));
-            $cells.=wf_TableCell(round($rawData['paymentscorr'], 2));
-            $cells.=wf_TableCell(round($rawData['balance'], 2));
-            $cells.=wf_TableCell(round($rawData['used'], 2));
-            $result.=wf_TableRow($cells, 'row3');
+        }
+        return ($result);
+    }
+
+    /**
+     * Returns totals data from previous renderCorpsFlows runs
+     * 
+     * @return string
+     */
+    public function renderCorpsFlowsTotal() {
+        $result = '';
+        if (!empty($this->fundsTmp)) {
+            $cells = wf_TableCell('');
+            $cells.=wf_TableCell(__('Total'));
+            $cells.=wf_TableCell('');
+            $cells.=wf_TableCell('');
+            $cells.=wf_TableCell(round($this->fundsTmp['col1'], 2));
+            $cells.=wf_TableCell(round($this->fundsTmp['col2'], 2));
+            $cells.=wf_TableCell(round($this->fundsTmp['col3'], 2));
+            $cells.=wf_TableCell(round($this->fundsTmp['col4'], 2));
+            $result.=wf_TableRow($cells, 'row2');
         }
         return ($result);
     }
@@ -364,6 +467,7 @@ class FundsFlow {
      * 
      * @param string $year
      * @param string $month
+     * 
      * @return string
      */
     public function renderCorpsFlowsHeaders($year, $month) {
@@ -431,9 +535,8 @@ class FundsFlow {
      * Returns user online left days
      * 
      * @param string $login existing users login
-     * @param double $userBalance current users balance
-     * @param string $userTariff users tariff
      * @param bool   $rawdays show only days count
+     * 
      * @return string
      */
     public function getOnlineLeftCount($login, $rawDays = false) {
@@ -496,21 +599,20 @@ class FundsFlow {
                             }
                         }
                     }
-                    $daysLabel=$daysOnLine;
-                    $dateLabel= date("d.m.Y", time() + ($daysOnLine * 24 * 60 * 60));
+                    $daysLabel = $daysOnLine;
+                    $dateLabel = date("d.m.Y", time() + ($daysOnLine * 24 * 60 * 60));
                 } else {
-                    $daysLabel='&infin;';
-                    $dateLabel='&infin;';
+                    $daysLabel = '&infin;';
+                    $dateLabel = '&infin;';
                 }
 
 
                 $balanceExpire = wf_tag('span', false, 'alert_info');
                 $balanceExpire.=__('Current Cash state') . ': ' . wf_tag('b') . $userBalanceRaw . wf_tag('b', true) . ', ' . __('which should be enough for another');
                 $balanceExpire.=' ' . $daysLabel . ' ' . __('days') . ' ' . __('of service usage') . ' ';
-                $balanceExpire.= __('or enought till the') . ' ' .$dateLabel. ' ';
+                $balanceExpire.= __('or enought till the') . ' ' . $dateLabel . ' ';
                 $balanceExpire.= __('according to the tariff') . ' ' . $userTariff . ' (' . $tariffFee . ' / ' . __($tariffPeriod) . ')';
                 $balanceExpire.= wf_tag('span', true);
-                
             } else {
                 $balanceExpire = wf_tag('span', false, 'alert_warning') . __('Current Cash state') . ': ' . wf_tag('b') . $userBalanceRaw . wf_tag('b', true);
                 $balanceExpire.=', ' . __('indebtedness') . '!' . ' ' . wf_tag('span', true);
@@ -521,6 +623,109 @@ class FundsFlow {
             }
         }
         return ($balanceExpire);
+    }
+
+    /**
+     * Loads all user and tariffs data
+     * 
+     * @return void
+     */
+    public function runDataLoders() {
+        $this->loadAllUserData();
+        $this->loadAllTariffsData();
+    }
+
+    /**
+     * Returns user online left days without additional DB queries
+     * runDataLoaders() must be run once, before usage
+     * 
+     * @param string $login existing users login
+     * 
+     * @return int >=0: days left, -1: debt, -2: zero tariff price
+     */
+    public function getOnlineLeftCountFast($login) {
+        if (isset($this->allUserData[$login])) {
+            $userData = $this->allUserData[$login];
+        }
+
+        $daysOnLine = 0;
+
+        if (!empty($userData)) {
+            $userTariff = $userData['Tariff'];
+            $userBalanceRaw = $userData['Cash'];
+            $userBalance = $userData['Cash'];
+            if (isset($this->allTariffsData[$userTariff])) {
+                $tariffData = $this->allTariffsData[$userTariff];
+                $tariffFee = $tariffData['Fee'];
+                $tariffPeriod = isset($tariffData['period']) ? $tariffData['period'] : 'month';
+
+                if (isset($this->alterConf['SPREAD_FEE'])) {
+                    if ($this->alterConf['SPREAD_FEE']) {
+                        $spreadFee = true;
+                    } else {
+                        $spreadFee = false;
+                    }
+                } else {
+                    $spreadFee = false;
+                }
+
+
+                if ($userBalance >= 0) {
+                    if ($tariffFee > 0) {
+                        //spread fee
+                        if ($spreadFee) {
+                            if ($tariffPeriod == 'month') {
+                                //monthly period
+                                while ($userBalance >= 0) {
+                                    $daysOnLine++;
+                                    $dayFee = $tariffFee / date('t', time() + ($daysOnLine * 24 * 60 * 60));
+                                    $userBalance = $userBalance - $dayFee;
+                                }
+                            } else {
+                                //daily period
+                                while ($userBalance >= 0) {
+                                    $daysOnLine++;
+                                    $userBalance = $userBalance - $tariffFee;
+                                }
+                            }
+                        } else {
+                            //non spread fee
+                            if ($tariffPeriod == 'month') {
+                                //monthly non spread fee
+                                while ($userBalance >= 0) {
+                                    $daysOnLine = $daysOnLine + date('t', time() + ($daysOnLine * 24 * 60 * 60)) - date('d', time() + ($daysOnLine * 24 * 60 * 60)) + 1;
+                                    $userBalance = $userBalance - $tariffFee;
+                                }
+                            } else {
+                                //daily non spread fee
+                                while ($userBalance >= 0) {
+                                    $daysOnLine++;
+                                    $userBalance = $userBalance - $tariffFee;
+                                }
+                            }
+                        }
+                    } else {
+                        $daysOnLine = '-2';
+                    }
+                } else {
+                    $daysOnLine = '-1';
+                }
+            }
+        }
+
+        return ($daysOnLine);
+    }
+
+    public function makeFreezeMonthFee() {
+        $cost = $this->alterConf['FREEZEMONTH_COST'];
+        $cashType = $this->alterConf['FREEZEMONTH_CASHTYPE'];
+        if (!empty($this->allUserData)) {
+            foreach ($this->allUserData as $eachUser) {
+                if ($eachUser['Passive'] == 1) {
+                    zb_CashAdd($eachUser['login'], -1 * $cost, 'add', $cashType, 'FROZEN:' . $cost);
+                }
+            }
+        }
     }
 
 }

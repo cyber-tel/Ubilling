@@ -796,7 +796,7 @@ function web_EditorTwoStringDataForm($fieldnames, $fieldkeys, $olddata) {
     $cells.= wf_TableCell(wf_TextInput($fieldkey1, '', $olddata[1], false, ''), '', 'row3');
     $rows = wf_TableRow($cells);
 
-    $cells = wf_TableCell($field1, '', 'row2');
+    $cells = wf_TableCell($field2, '', 'row2');
     $cells.= wf_TableCell(wf_TextInput($fieldkey2, '', $olddata[2], false, ''), '', 'row3');
     $rows.= wf_TableRow($cells);
 
@@ -867,6 +867,19 @@ function zb_TranslatePaymentNote($paynote, $allservicenames) {
     if (ispos($paynote, 'PENALTY')) {
         $penalty = explode(':', $paynote);
         $paynote = __('Penalty') . ' ' . $penalty[1] . ' ' . __('days');
+    }
+
+    if (ispos($paynote, 'REMINDER')) {
+        $paynote = __('SMS reminder activation');
+    }
+
+    if (ispos($paynote, 'FRIENDSHIP')) {
+        $friendship = explode(':', $paynote);
+        $paynote = __('Friendship') . ' ' . $friendship[1];
+    }
+
+    if (ispos($paynote, 'SCHEDULED')) {
+        $paynote = __('Scheduled');
     }
 
     return ($paynote);
@@ -2502,12 +2515,14 @@ function web_TariffShowMoveCharts() {
     $cells = '';
     $rows = '';
 
+    $chartOpts = "chartArea: {  width: '90%', height: '90%' }, legend : {position: 'right'}, ";
+
     if (!empty($fromData)) {
-        $cells.= wf_TableCell(wf_gcharts3DPie($fromData, __('Current tariff'), '400px', '400px'));
+        $cells.= wf_TableCell(wf_gcharts3DPie($fromData, __('Current tariff'), '400px', '400px', $chartOpts));
     }
 
     if (!empty($fromData)) {
-        $cells.= wf_TableCell(wf_gcharts3DPie($toData, __('Next month'), '400px', '400px'));
+        $cells.= wf_TableCell(wf_gcharts3DPie($toData, __('Next month'), '400px', '400px', $chartOpts));
     }
     $rows.= wf_TableRow($cells);
     $result.=wf_TableBody($rows, '100%', 0);
@@ -2539,7 +2554,8 @@ function web_TariffShowTariffCharts() {
     }
 
     if (!empty($chartData)) {
-        $result.= wf_gcharts3DPie($chartData, __('Users'), '400px', '400px');
+        $chartOpts = "chartArea: {  width: '90%', height: '90%' }, legend : {position: 'right'}, ";
+        $result.= wf_gcharts3DPie($chartData, __('Users'), '400px', '400px', $chartOpts);
     }
 
     return ($result);
@@ -2765,7 +2781,7 @@ function zb_BillingCheckUpdates() {
  */
 function zb_BillingStats($quiet = false) {
     $ubstatsurl = 'http://stats.ubilling.net.ua/';
-
+    $statsflag = 'exports/NOTRACK';
     //detect host id
     $hostid_q = "SELECT * from `ubstats` WHERE `key`='ubid'";
     $hostid = simple_query($hostid_q);
@@ -2780,22 +2796,16 @@ function zb_BillingStats($quiet = false) {
     }
 
     //detect stats collection feature
-    $statscollect_q = "SELECT * from `ubstats` WHERE `key`='ubtrack'";
-    $statscollect = simple_query($statscollect_q);
-    if (empty($statscollect)) {
-        $newstatscollect_q = "INSERT INTO `ubstats` (`id` ,`key` ,`value`) VALUES (NULL , 'ubtrack', '1');";
-        nr_query($newstatscollect_q);
-        $thiscollect = 1;
-    } else {
-        $thiscollect = $statscollect['value'];
-    }
+    $thiscollect = (file_exists($statsflag)) ? 0 : 1;
 
     //disabling collect subroutine
     if (isset($_POST['editcollect'])) {
         if (!isset($_POST['collectflag'])) {
-            simple_update_field('ubstats', 'value', '0', "WHERE `key`='ubtrack'");
+            file_put_contents($statsflag, 'Im greedy bastard');
         } else {
-            simple_update_field('ubstats', 'value', '1', "WHERE `key`='ubtrack'");
+            if (file_exists($statsflag)) {
+                unlink($statsflag);
+            }
         }
         rcms_redirect("?module=report_sysload");
     }
@@ -2834,23 +2844,20 @@ function zb_BillingStats($quiet = false) {
     $ubversion = vf($ubversion[0], 3);
 
     $releasebox = wf_tag('span', false, '', 'id="lastrelease"');
-    $releasebox.=wf_tag('span', true) . '<br>';
-    $updatechecker = '<a href="#checkupdates"  onclick="goajax(\'?module=report_sysload&checkupdates=true\',\'lastrelease\');" title="' . __('Check updates') . '">' . $releaseinfo . ' (' . __('Check updates') . '?)</a>';
-
+    $releasebox.=wf_tag('span', true) . wf_tag('br');
+    $updatechecker= wf_AjaxLink('?module=report_sysload&checkupdates=true', $releaseinfo . ' (' . __('Check updates') . '?)', 'lastrelease', false, '');
     $ubstatsinputs = zb_AjaxLoader();
-
-    $ubstatsinputs.=wf_tag('b') . __('Serial key') . ': ' . wf_tag('b', true) . $thisubid . '<br>';
-    $ubstatsinputs.=wf_tag('b') . __('Use this to request technical support') . ': ' . wf_tag('b', true) . wf_tag('font', false, '', 'color="#076800"') . substr($thisubid, -4) . wf_tag('font', true) . '<br>';
+    $ubstatsinputs.=wf_tag('b') . __('Serial key') . ': ' . wf_tag('b', true) . $thisubid . wf_tag('br');
+    $ubstatsinputs.=wf_tag('b') . __('Use this to request technical support') . ': ' . wf_tag('b', true) . wf_tag('font', false, '', 'color="#076800"') . substr($thisubid, -4) . wf_tag('font', true) . wf_tag('br');
     $ubstatsinputs.=wf_tag('b') . __('Ubilling version') . ': ' . wf_tag('b', true) . $updatechecker . wf_tag('br');
     $ubstatsinputs.=$releasebox;
     $ubstatsinputs.=wf_HiddenInput('editcollect', 'true');
     $ubstatsinputs.=wf_CheckInput('collectflag', 'I want to help make Ubilling better', false, $thiscollect);
     $ubstatsinputs.=' ' . wf_Submit('Save');
     $ubstatsform = wf_Form("", 'POST', $ubstatsinputs, 'glamour');
-
+    $ubstatsform.= wf_CleanDiv();
     $statsurl = $ubstatsurl . '?u=' . $thisubid . 'x' . $usercount . 'x' . $tariffcount . 'x' . $nascount . 'x' . $paycount . 'x' . $eventcount . 'x' . $ubversion;
-    $tracking_code = '<div style="display:none;"><iframe src="' . $statsurl . '" width="1" height="1" frameborder="0"></iframe></div>';
-
+    $tracking_code = wf_tag('div', false, '', 'style="display:none;"').wf_tag('iframe',false,'','src="' . $statsurl . '" width="1" height="1" frameborder="0"').wf_tag('iframe',true).wf_tag('div',true);
     if ($quiet == false) {
         show_window(__('Billing info'), $ubstatsform);
     }
@@ -3049,58 +3056,87 @@ function web_ConfigEditorShow($prefix, $configdata, $optsdata) {
     if ((!empty($configdata)) AND ( !empty($optsdata))) {
         foreach ($optsdata as $option => $handlers) {
 
-            if (isset($configdata[$option])) {
-                $currentdata = $configdata[$option];
-                $handlers = explode('|', $handlers);
-                $type = $handlers[0];
+            if ((isset($configdata[$option])) OR ( ispos($option, 'CHAPTER'))) {
+                if (!ispos($option, 'CHAPTER')) {
+                    $currentdata = $configdata[$option];
+                    $handlers = explode('|', $handlers);
+                    $type = $handlers[0];
 
-                //option description
-                if (!empty($handlers[1])) {
-                    $description = trim($handlers[1]);
-                    $description = __($description);
-                } else {
-                    $description = $option;
-                }
+                    //option description
+                    if (!empty($handlers[1])) {
+                        $description = trim($handlers[1]);
+                        $description = __($description);
+                    } else {
+                        $description = $option;
+                    }
 
-                //option controls
-                if ($type == 'TRIGGER') {
-                    $control = web_bool_led($configdata[$option]);
-                }
+                    //option controls
+                    if ($type == 'TRIGGER') {
+                        $control = web_bool_led($configdata[$option]);
+                    }
 
-                if ($type == 'VARCHAR') {
-                    if ($hide_passwords) {
-                        if (isset($handlers[2])) {
-                            if ($handlers[2] == 'PASSWD') {
-                                $datavalue = __('Hidden');
+                    if ($type == 'VARCHAR') {
+                        if ($hide_passwords) {
+                            if (isset($handlers[2])) {
+                                if ($handlers[2] == 'PASSWD') {
+                                    $datavalue = __('Hidden');
+                                } else {
+                                    $datavalue = $configdata[$option];
+                                }
                             } else {
                                 $datavalue = $configdata[$option];
                             }
                         } else {
                             $datavalue = $configdata[$option];
                         }
-                    } else {
-                        $datavalue = $configdata[$option];
+                        $control = wf_tag('input', false, '', 'type="text" name="' . $prefix . '_' . $option . '" size="25" value="' . $datavalue . '" readonly') . "\n";
                     }
-                    $control = wf_tag('input', false, '', 'type="text" name="' . $prefix . '_' . $option . '" size="25" value="' . $datavalue . '" readonly') . "\n";
-                }
 
 
-                $result.=$control . ' ' . $description . '<br>';
-            } else {
-                if (ispos($option, 'CHAPTER')) {
-                    $result.=wf_tag('h3', false);
-                    $result.=__($handlers);
-                    $result.=wf_tag('h3', true);
+                    $result.=$control . ' ' . $description . wf_tag('br');
                 } else {
-                    $result.=wf_tag('font', false, '', 'color="#FF0000"');
-                    $result.=__('You missed an important option') . ': ' . $option . '';
-                    $result.=wf_tag('font', true);
-                    $result.=wf_tag('br');
+                    if (ispos($option, 'CHAPTER_')) {
+                        $result.=wf_tag('div', false, '', 'id="tabs-' . $option . '"');
+                        $result.=wf_tag('h2', false);
+                        $result.=__($handlers);
+                        $result.=wf_tag('h2', true);
+                    }
+
+                    if (ispos($option, 'CHAPTEREND_')) {
+                        $result.=wf_tag('div', true) . "\n";
+                    }
                 }
+            } else {
+                $result.=wf_tag('div', false, '', 'style="vertical-align: top; margin:5px; padding:5px; "');
+                $result.=wf_tag('font', false, '', 'style="color: #FF0000;  font-size:100%"');
+                $result.=__('You missed an important option') . ': ' . $option . '';
+                $result.=wf_tag('font', true);
+                $result.=wf_tag('div', true);
+                $result.=wf_tag('br');
             }
         }
     }
 
+    return ($result);
+}
+
+/**
+ * Returns tabs list to display in sysconf module
+ * 
+ * @param array $optsdata
+ * @return string
+ */
+function web_ConfigGetTabsControls($optsdata) {
+    $result = '';
+    if (!empty($optsdata)) {
+        foreach ($optsdata as $io => $each) {
+            if (!empty($io)) {
+                if (ispos($io, 'CHAPTER_')) {
+                    $result.=wf_tag('li') . wf_tag('a', false, '', 'href="#tabs-' . $io . '"') . __($each) . wf_tag('a', true) . wf_tag('li', true);
+                }
+            }
+        }
+    }
     return ($result);
 }
 
@@ -4226,6 +4262,14 @@ function zb_xml2array($contents, $get_attributes = 1, $priority = 'tag') {
 
 
 
+
+
+
+
+
+
+
+
         
 //Initializations
     $xml_array = array();
@@ -4376,10 +4420,75 @@ function zb_CheckPHPExtensions() {
  * @return bool
  */
 function zb_checkDate($date) {
-    $explode=  explode('-', $date);
+    $explode = explode('-', $date);
     @$year = $explode[0];
     @$month = $explode[1];
     @$day = $explode[2];
     $result = checkdate($month, $day, $year);
+    return ($result);
+}
+
+/**
+ * Cuts last char of string
+ * 
+ * @param string $string
+ * @return string
+ */
+function zb_CutEnd($string) {
+    $string = substr($string, 0, -1);
+    return ($string);
+}
+
+/**
+ * Returns memcached usage stats
+ * 
+ * @global object $ubillingConfig
+ * @return string
+ */
+function web_MemCachedRenderStats() {
+    global $ubillingConfig;
+    $altCfg = $ubillingConfig->getAlter();
+    $result = '';
+    $memcachedHost = 'localhost';
+    $memcachedPort = 11211;
+    if (isset($altCfg['MEMCACHED_SERVER'])) {
+        $memcachedHost = $altCfg['MEMCACHED_SERVER'];
+    }
+    if (isset($altCfg['MEMCACHED_PORT'])) {
+        $memcachedPort = $altCfg['MEMCACHED_PORT'];
+    }
+    $memcached = new Memcached();
+    $memcached->addServer($memcachedHost, $memcachedPort);
+    $rawStats = $memcached->getStats();
+
+    $cells = wf_TableCell(__('Parameter'));
+    $cells.= wf_TableCell(__('Value'));
+    $rows = wf_TableRow($cells, 'row1');
+
+    if (!empty($rawStats)) {
+        if (isset($rawStats[$memcachedHost . ':' . $memcachedPort])) {
+            foreach ($rawStats[$memcachedHost . ':' . $memcachedPort] as $io => $each) {
+                $cells = wf_TableCell($io);
+                $cells.= wf_TableCell($each);
+                $rows.= wf_TableRow($cells, 'row3');
+            }
+        }
+    }
+
+    $result = wf_TableBody($rows, '100%', 0, '');
+    return ($result);
+}
+
+/**
+ * Calculates percent value
+ * 
+ * @param float $sum
+ * @param float $percent
+ * 
+ * @return float
+ */
+function zb_Percent($sum, $percent) {
+    // и не надо ржать, я реально не могу запомнить чего куда делить и умножать
+    $result = $percent / 100 * $sum;
     return ($result);
 }

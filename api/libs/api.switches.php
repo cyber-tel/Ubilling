@@ -185,10 +185,21 @@ function web_SwitchModelSelector($selectname = 'switchmodelid') {
  * @param string $snmptemplate
  */
 function ub_SwitchModelAdd($name, $ports, $snmptemplate = '') {
-    $ports = vf($ports);
+    $ports = vf($ports, 3);
     $nameClean = mysql_real_escape_string($name);
     $snmptemplate = mysql_real_escape_string($snmptemplate);
-    $query = 'INSERT INTO `switchmodels` (`id` ,`modelname` ,`ports`,`snmptemplate`) VALUES (NULL , "' . $nameClean . '", "' . $ports . '","' . $snmptemplate . '");';
+    if (empty($ports)) {
+        $ports = 'NULL';
+    } else {
+        $ports = "'" . $ports . "'";
+    }
+
+    if (empty($snmptemplate)) {
+        $snmptemplate = 'NULL';
+    } else {
+        $snmptemplate = "'" . $snmptemplate . "'";
+    }
+    $query = "INSERT INTO `switchmodels` (`id` ,`modelname` ,`ports`,`snmptemplate`) VALUES (NULL , '" . $nameClean . "', " . $ports . "," . $snmptemplate . ");";
     nr_query($query);
     log_register('SWITCHMODEL ADD `' . $name . '`');
 }
@@ -197,9 +208,11 @@ function ub_SwitchModelAdd($name, $ports, $snmptemplate = '') {
  * Deletes switch model from database by its ID
  * 
  * @param integer $modelid
+ * 
+ * @return void
  */
 function ub_SwitchModelDelete($modelid) {
-    $modelid = vf($modelid);
+    $modelid = vf($modelid, 3);
     $query = 'DELETE FROM `switchmodels` WHERE `id` = "' . $modelid . '"';
     nr_query($query);
     log_register('SWITCHMODEL DELETE  [' . $modelid . ']');
@@ -364,6 +377,16 @@ function web_SwitchEditForm($switchid) {
         }
     }
 
+    if (!empty($switchdata['ip'])) {
+        $result.=wf_AjaxLink('?module=switches&backgroundicmpping=' . $switchdata['ip'], wf_img('skins/ping_icon.png') . ' ' . __('ICMP ping'), 'icmppingcontainer', false, 'ubButton');
+    }
+
+    if (isset($altCfg['SW_WEBNAV'])) {
+        if ($altCfg['SW_WEBNAV']) {
+            $result.=' ' . wf_tag('a', false, 'ubButton', 'href="http://' . $switchdata['ip'] . '" target="_BLANK"') . wf_img('skins/ymaps/globe.png') . ' ' . __('Go to the web interface') . wf_tag('a', true) . ' ';
+        }
+    }
+
 
     if (cfr('SWITCHEDIT')) {
         if (!ispos($switchdata['desc'], 'NP')) {
@@ -373,6 +396,11 @@ function web_SwitchEditForm($switchid) {
 
     if (cfr('SWITCHESEDIT')) {
         $result.= wf_JSAlertStyled('?module=switches&switchdelete=' . $switchid, web_delete_icon() . ' ' . __('Delete'), 'Removing this may lead to irreparable results', 'ubButton');
+    }
+
+    if (!empty($switchdata['ip'])) {
+        $result.=wf_AjaxLoader();
+        $result.=wf_AjaxContainer('icmppingcontainer');
     }
 
 
@@ -659,8 +687,12 @@ function web_SwitchesShow() {
                         } else {
                             $deathClock = '';
                         }
+
+                        //switch location link
+                        $switchLocator = wf_Link('?module=switches&gotoswitchbyip=' . $ip, web_edit_icon(__('Go to switch')));
+
                         //add switch as dead
-                        $ajaxResult.=$devicefind . '&nbsp;' . $deathClock . $ip . ' - ' . $switch . '<br>';
+                        $ajaxResult.=$devicefind . ' ' . $switchLocator . ' ' . $deathClock . $ip . ' - ' . $switch . '<br>';
                     }
                 } else {
                     $ajaxResult = __('Switches are okay, everything is fine - I guarantee');
@@ -735,7 +767,6 @@ function web_SwitchesShow() {
             $tablecells.=wf_TableCell($eachswitch['desc']);
             $switchcontrols = '';
             if (cfr('SWITCHESEDIT')) {
-                //$switchcontrols.=wf_JSAlert('?module=switches&switchdelete=' . $eachswitch['id'], web_delete_icon(), 'Removing this may lead to irreparable results');
                 $switchcontrols.=wf_Link('?module=switches&edit=' . $eachswitch['id'], web_edit_icon());
             }
 
@@ -769,6 +800,12 @@ function web_SwitchesShow() {
 
             if ($alterconf['ADCOMMENTS_ENABLED']) {
                 $switchcontrols.=$adcomments->getCommentsIndicator($eachswitch['id']);
+            }
+
+            if (isset($alterconf['SW_WEBNAV'])) {
+                if ($alterconf['SW_WEBNAV']) {
+                    $switchcontrols.=' ' . wf_tag('a', false, '', 'href="http://' . $eachswitch['ip'] . '" target="_BLANK"') . wf_img('skins/ymaps/globe.png', __('Go to the web interface')) . wf_tag('a', true);
+                }
             }
 
             $tablecells.=wf_TableCell($switchcontrols);
@@ -911,6 +948,63 @@ function ub_JGetSwitchDeadLog() {
             $i++;
         }
     }
+    return ($result);
+}
+
+/**
+ * Renders dead switches top
+ * 
+ * @return string
+ */
+function web_DeadSwitchesTop() {
+    $topThreshold = 10;
+    $result = '';
+    $cyear = curyear();
+    $query = "SELECT `id`,`date`,`timestamp`,`swdead` from `switchdeadlog` WHERE `date` LIKE '" . $cyear . "-%' ORDER BY `id` ASC";
+    $rawData = simple_queryall($query);
+    $topTmp = array();
+    $totalCount = 0;
+
+    if (!empty($rawData)) {
+        foreach ($rawData as $io => $each) {
+            if (!empty($each['swdead'])) {
+                $deadData = unserialize($each['swdead']);
+                if (!empty($deadData)) {
+                    foreach ($deadData as $eachDeadIp => $eachDeadName) {
+                        if (isset($topTmp[$eachDeadIp])) {
+                            $topTmp[$eachDeadIp]['count'] ++;
+                        } else {
+                            $topTmp[$eachDeadIp]['count'] = 1;
+                            $topTmp[$eachDeadIp]['name'] = $eachDeadName;
+                        }
+                        $totalCount++;
+                    }
+                }
+            }
+        }
+    }
+
+    if (!empty($topTmp)) {
+        $cells = wf_TableCell(__('IP'));
+        $cells.= wf_TableCell(__('Location'));
+        $cells.= wf_TableCell(__('Count'));
+        $cells.= wf_TableCell(__('Visual'));
+        $rows = wf_TableRow($cells, 'row1');
+
+
+        foreach ($topTmp as $io => $each) {
+            if ($each['count'] > $topThreshold) {
+                $cells = wf_TableCell($io);
+                $cells.= wf_TableCell($each['name']);
+                $cells.= wf_TableCell($each['count']);
+                $cells.= wf_TableCell(web_bar($each['count'], $totalCount));
+                $rows.= wf_TableRow($cells, 'row3');
+            }
+        }
+
+        $result = wf_TableBody($rows, '100%', 0, 'sortable');
+    }
+
     return ($result);
 }
 
@@ -1105,5 +1199,23 @@ function zb_SwitchReplace($fromId, $toId, $employeeId) {
         show_error(__('Strange exeption') . ': FROM_SWITCH_EMPTY_DATA');
     }
 }
+
+/**
+ * Trys to detect switch ID by its IP
+ * 
+ * @param string $ip
+ * @return int
+ */
+function zb_SwitchGetIdbyIP($ip) {
+    $result = '';
+    $ip = mysql_real_escape_string($ip);
+    $query = "SELECT `id`,`ip` from `switches` WHERE `ip`='" . $ip . "' LIMIT 1;";
+    $raw = simple_query($query);
+    if (!empty($raw)) {
+        $result = $raw['id'];
+    }
+    return ($result);
+}
+
 
 ?>

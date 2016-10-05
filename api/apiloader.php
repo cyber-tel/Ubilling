@@ -11,6 +11,7 @@ include('api/libs/api.morph.php');
 include('api/libs/api.ubconfig.php');
 include('api/libs/api.ubcache.php');
 include('api/libs/api.astral.php');
+include('api/libs/api.barcodeqr.php');
 include('api/libs/api.dbconnect.php');
 include('api/libs/api.userdata.php');
 include('api/libs/api.usersearch.php');
@@ -21,6 +22,7 @@ include('api/libs/api.networking.php');
 include('api/libs/api.userreg.php');
 include('api/libs/api.workicons.php');
 include('api/libs/api.workaround.php');
+include('api/libs/api.usms.php');
 include('api/libs/api.payments.php');
 include('api/libs/api.usertags.php');
 include('api/libs/api.cess.php');
@@ -72,6 +74,18 @@ include('api/libs/api.pon.php');
 include('api/libs/api.cudiscounts.php');
 include('api/libs/api.cap.php');
 include('api/libs/api.opayz.php');
+include('api/libs/api.salary.php');
+include('api/libs/api.cemetery.php');
+include('api/libs/api.warehouse.php');
+include('api/libs/api.reminder.php');
+include('api/libs/api.friendship.php');
+include('api/libs/api.migration.php');
+include('api/libs/api.percity.php');
+include('api/libs/api.dealwithit.php');
+include('api/libs/api.megogo.php');
+include('api/libs/api.userside.php');
+include('api/libs/api.whois.php');
+include('api/libs/api.exhorse.php');
 
 /*
  * Initial class creation

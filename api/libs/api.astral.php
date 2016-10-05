@@ -289,6 +289,13 @@ function wf_Submit($value) {
     return ($result);
 }
 
+function wf_SubmitClassed($value, $class = '', $name = '', $caption = '') {
+    $result = '<button type="submit" value="' . $value . '" name="' . $name . '" class= "' . $class . '">';
+    $result.= $caption;
+    $result.= '</button>';
+    return ($result);
+}
+
 /**
  * Return Trigger select web form input
  *
@@ -365,6 +372,45 @@ function wf_Selector($name, $params, $label, $selected = '', $br = false) {
 }
 
 /**
+ * Return select Web From element 
+ * 
+ * @param string $name
+ * @param string $params
+ * @param string $label
+ * @param string $selected
+ * @param bool $br
+ * @param string $class
+ * @return string
+ */
+function wf_SelectorClassed($name, $params, $label, $selected = '', $br = false, $class = '') {
+    $inputid = wf_InputId();
+    if ($br) {
+        $newline = '<br>';
+    } else {
+        $newline = '';
+    }
+    $result = '<select name="' . $name . '" id="' . $inputid . '" class="' . $class . '">';
+    if (!empty($params)) {
+        foreach ($params as $value => $eachparam) {
+            $sel_flag = '';
+            if ($selected != '') {
+                if ($selected == $value) {
+                    $sel_flag = 'SELECTED';
+                }
+            }
+            $result.='<option value="' . $value . '" ' . $sel_flag . '>' . $eachparam . '</option>' . "\n";
+        }
+    }
+
+    $result.='</select>' . "\n";
+    if ($label != '') {
+        $result.='<label for="' . $inputid . '">' . __($label) . '</label>';
+    }
+    $result.=$newline . "\n";
+    return ($result);
+}
+
+/**
  * Return select Web From element with auto click option
  *
  * @param string  $name name of element
@@ -407,7 +453,7 @@ function wf_SelectorAC($name, $params, $label, $selected = '', $br = false) {
  * Return select Web From element with auto click option into ajax container
  *
  * @param string  $container name of container element
- * @param array   $params array of elements $value=>$option
+ * @param array   $params array of elements $url=>$option
  * @param string  $label text label for input
  * @param string  $selected selected $value for selector
  * @param bool    $br append new line
@@ -421,7 +467,7 @@ function wf_AjaxSelectorAC($container, $params, $label, $selected = '', $br = fa
     } else {
         $newline = '';
     }
-    $result = '<select name="' . $inputid . '" id="' . $inputid . '" >';
+    $result = '<select name="' . $inputid . '" id="' . $inputid . '" onChange="this.options[this.selectedIndex].onclick();">';
     if (!empty($params)) {
         foreach ($params as $value => $eachparam) {
             $sel_flag = '';
@@ -430,7 +476,7 @@ function wf_AjaxSelectorAC($container, $params, $label, $selected = '', $br = fa
                     $sel_flag = 'SELECTED';
                 }
             }
-            $result.='<option value="' . $value . '" ' . $sel_flag . ' onClick="goajax(\'' . $value . '\',\'' . $container . '\');">' . $eachparam . '</option>' . "\n";
+            $result.='<option value="' . $value . '" ' . $sel_flag . ' onclick="goajax(\'' . $value . '\',\'' . $container . '\');">' . $eachparam . '</option>' . "\n";
         }
     }
 
@@ -506,9 +552,44 @@ function wf_YearSelector($name, $label = '', $br = false) {
     } else {
         $newline = '';
     }
-    $selector = '<select name="' . $name . '">';
+    $selector = '<select name="' . $name . '" id="' . $inputid . '">';
     for ($i = 0; $i < $count; $i++) {
         $selector.='<option value="' . ($curyear - $i) . '">' . ($curyear - $i) . '</option>';
+    }
+    $selector.='</select>';
+    if ($label != '') {
+        $selector.='<label for="' . $inputid . '">' . __($label) . '</label>';
+    }
+    $selector.=$newline;
+    return($selector);
+}
+
+/**
+ * Return Year select Web From element 
+ *
+ * @param string  $name name of element
+ * @param string  $label text label for input
+ * @param bool    $br append new line
+ * @param int     $year selected year
+ * 
+ * @return  string
+ *
+ */
+function wf_YearSelectorPreset($name, $label = '', $br = false, $year = '') {
+    $curyear = curyear();
+    $inputid = wf_InputId();
+    $count = 9;
+    $selected = '';
+
+    if ($br) {
+        $newline = '<br>';
+    } else {
+        $newline = '';
+    }
+    $selector = '<select name="' . $name . '" id="' . $inputid . '">';
+    for ($i = 0; $i < $count; $i++) {
+        $selected = (($curyear - $i) == $year) ? 'SELECTED' : '';
+        $selector.='<option value="' . ($curyear - $i) . '" ' . $selected . '>' . ($curyear - $i) . '</option>';
     }
     $selector.='</select>';
     if ($label != '') {
@@ -579,6 +660,24 @@ function wf_TableRow($cells, $class = '') {
         $rowclass = '';
     }
     $result = '<tr ' . $rowclass . '>' . $cells . '</tr>' . "\n";
+    return ($result);
+}
+
+/**
+ * Construct HTML table row element with style inside
+ * 
+ * @param string $cells table row cells
+ * @param string $class table row class
+ * @return string
+ *  
+ */
+function wf_TableRowStyled($cells, $class = '', $style = '') {
+    if ($class != '') {
+        $rowclass = 'class="' . $class . '"';
+    } else {
+        $rowclass = '';
+    }
+    $result = '<tr style="' . $style . '" ' . $rowclass . '>' . $cells . '</tr>' . "\n";
     return ($result);
 }
 
@@ -882,6 +981,7 @@ function wf_DatePicker($field, $extControls = false) {
     if ($extControls) {
         $extControls = ',
                         changeMonth: true,
+                        yearRange: "-100:+100",
                         changeYear: true';
     } else {
         $extControls = '';
@@ -978,6 +1078,7 @@ function wf_DatePickerPreset($field, $date, $extControls = false) {
     if ($extControls) {
         $extControls = ',
                         changeMonth: true,
+                        yearRange: "-100:+100",
                         changeYear: true';
     } else {
         $extControls = '';
@@ -1329,6 +1430,20 @@ function wf_AjaxLoader() {
 }
 
 /**
+ * Returns default ajax container
+ * 
+ * @param string $containerName container name aka ID
+ * @param string $options misc options like size/display if required
+ * @param srring $content default container content
+ * 
+ * @return string
+ */
+function wf_AjaxContainer($containerName, $options = '', $content = '') {
+    $result = wf_tag('div', false, '', 'id="' . $containerName . '" ' . $options . ' ') . $content . wf_tag('div', true);
+    return ($result);
+}
+
+/**
  * Returns new opened modal window with some content
  * 
  * @param string $title modal window title
@@ -1360,7 +1475,7 @@ $(function() {
 			width: ' . $width . ',
                         height: ' . $height . ',
 			modal: true,
-			show: "drop",
+                        show: "drop",
 			hide: "fold"
 		});
 
@@ -1414,6 +1529,40 @@ function wf_Graph($data, $width = '500', $height = '300', $errorbars = false) {
     $result.= $objectId . ' = new Dygraph(';
     $result.= 'document.getElementById("' . $randomId . '"),' . "\n";
     $result.= $cleandata;
+
+    $result.=', {  errorBars: ' . $errorbars . ' }' . "\n";
+
+    $result.=');';
+    $result.= wf_tag('script', true);
+
+    return ($result);
+}
+
+/**
+ * Returns Chart source by data loaded from the file - acceptable for huge data sets
+ * 
+ * @param string $datafile  - existing CSV file path
+ * @param string $widht     - graph width in pixels
+ * @param string $height    - graph height in pixels
+ * @param bool   $errorbars - display error bars around data series
+ * 
+ * @return string
+ */
+function wf_GraphCSV($datafile, $width = '500', $height = '300', $errorbars = false) {
+    $randomId = wf_InputId();
+    $objectId = 'graph_' . $randomId;
+
+    if ($errorbars) {
+        $errorbars = 'true';
+    } else {
+        $errorbars = 'false';
+    }
+
+    $result = wf_tag('div', false, '', 'id="' . $randomId . '" style="width:' . $width . 'px; height:' . $height . 'px;"') . wf_tag('div', true);
+    $result.= wf_tag('script', false, '', 'type="text/javascript"');
+    $result.= $objectId . ' = new Dygraph(';
+    $result.= 'document.getElementById("' . $randomId . '"), "' . $datafile . '" ' . "\n";
+
 
     $result.=', {  errorBars: ' . $errorbars . ' }' . "\n";
 
@@ -1845,45 +1994,54 @@ function wf_JqDtLoader($columns, $ajaxUrl, $saveState = false, $objects = 'users
  * 
  * @param array $params data in format like string=>count
  * @param string $title chart title
- * @param type $width chart width in px or %, 500px default
- * @param type $height chart height in px or %, 500px default
+ * @param string $width chart width in px or %, 500px default
+ * @param string $height chart height in px or %, 500px default
+ * @param string $options google charts options, useful examples see below<br>
+ * pieSliceText: percentage/value/label/none OR  pieSliceText: 'value-and-percentage'<br>
+ * is3D: true/false <br>
+ * backgroundColor: '#666', <br>
+ * legend : {position: 'bottom', textStyle: {color: 'red', fontSize: 12 }}, <br>
+ * chartArea: {  width: '90%', height: '90%' }, <br>
+ * 
  * @return string
  */
-function wf_gcharts3DPie($params, $title = '', $width = '', $height = '') {
+function wf_gcharts3DPie($params, $title = '', $width = '', $height = '', $options = '') {
     global $ubillingConfig;
-    $altCfg=$ubillingConfig->getAlter();
-   
+    $altCfg = $ubillingConfig->getAlter();
+
     $containerId = wf_InputId();
     $width = ($width) ? $width : '500px';
     $height = ($height) ? $height : '500px';
     $result = '';
     $chartData = '';
-    $enableFlag=true;
- if (!isset($altCfg['GCHARTS_ENABLED'])) {
-     $enableFlag=true;
- } else {
-     if ($altCfg['GCHARTS_ENABLED']) {
-         $enableFlag=true;
-     } else {
-         $enableFlag=false;
-     }
- }
- 
- if ($enableFlag) {
-    if (!empty($params)) {
-        foreach ($params as $io => $each) {
-            $chartData.= '[\'' . $io . '\',' . $each . '],';
+    $enableFlag = true;
+    if (!isset($altCfg['GCHARTS_ENABLED'])) {
+        $enableFlag = true;
+    } else {
+        if ($altCfg['GCHARTS_ENABLED']) {
+            $enableFlag = true;
+        } else {
+            $enableFlag = false;
         }
-        $chartData = substr($chartData, 0, -1);
     }
 
+    if ($enableFlag) {
+        if (!empty($params)) {
+            foreach ($params as $io => $each) {
+                $chartData.= '[\'' . $io . '\',' . $each . '],';
+            }
+            $chartData = substr($chartData, 0, -1);
+        }
 
-    $result = wf_tag('script', false, '', 'type="text/javascript" src="https://www.google.com/jsapi"') . wf_tag('script', true);
-    $result.= wf_tag('script', false, '', 'type="text/javascript"');
-    $result.='
+//legend.scrollArrows.activeColor
+        $result = wf_tag('script', false, '', 'type="text/javascript" src="https://www.google.com/jsapi"') . wf_tag('script', true);
+        $result.= wf_tag('script', false, '', 'type="text/javascript"');
+        $result.='
       google.load("visualization", "1", {packages:["corechart"]});
       google.setOnLoadCallback(drawChart);
+      
       function drawChart() {
+
         var data = google.visualization.arrayToDataTable([
           [\'X\', \'Y\'],
            ' . $chartData . '
@@ -1892,6 +2050,7 @@ function wf_gcharts3DPie($params, $title = '', $width = '', $height = '') {
         var options = {
           title: \'' . $title . '\',
           is3D: true,
+          ' . $options . '
           \'tooltip\' : {
              trigger: \'none\'
             }
@@ -1902,11 +2061,80 @@ function wf_gcharts3DPie($params, $title = '', $width = '', $height = '') {
       }
 ';
 
-    $result.=wf_tag('script', true);
-    $result.= wf_tag('div', false, '', 'id="' . $containerId . '" style="width: ' . $width . '; height: ' . $height . ';"') . wf_tag('div', true);
- }
+        $result.=wf_tag('script', true);
+        $result.= wf_tag('div', false, '', 'id="' . $containerId . '" style="width: ' . $width . '; height: ' . $height . ';"') . wf_tag('div', true);
+    }
     return ($result);
-    
+}
+
+/**
+ * Renders Google line chart
+ * 
+ * @param array $params data in format like 
+ *      $params=array(
+ *       0=>array('month','total','active','inactive'),
+ *       1=>array('Февраль',200,150,50),
+ *       2=>array('Сентябрь',200,160,40)
+ *       );
+ * @param string $title chart title
+ * @param string $width chart width in px or %, 500px default
+ * @param string $height chart height in px or %, 500px default
+ * @param string $options google charts options
+ * 
+ * @return string
+ */
+function wf_gchartsLine($params, $title = '', $width = '', $height = '', $options = '') {
+    global $ubillingConfig;
+    $altCfg = $ubillingConfig->getAlter();
+
+    $containerId = wf_InputId();
+    $width = ($width) ? $width : '500px';
+    $height = ($height) ? $height : '500px';
+    $result = '';
+    $chartData = '';
+    $enableFlag = true;
+    if (!isset($altCfg['GCHARTS_ENABLED'])) {
+        $enableFlag = true;
+    } else {
+        if ($altCfg['GCHARTS_ENABLED']) {
+            $enableFlag = true;
+        } else {
+            $enableFlag = false;
+        }
+    }
+
+    if ($enableFlag) {
+        if (!empty($params)) {
+            $chartData = json_encode($params, JSON_NUMERIC_CHECK);
+        }
+
+        $result = wf_tag('script', false, '', 'type="text/javascript" src="https://www.gstatic.com/charts/loader.js"') . wf_tag('script', true);
+        $result.= wf_tag('script', false, '', 'type="text/javascript"');
+        $result.='google.charts.load(\'current\', {\'packages\':[\'corechart\']});
+      google.charts.setOnLoadCallback(drawChart);
+
+      function drawChart() {
+        var data = google.visualization.arrayToDataTable(
+          ' . $chartData . '
+        );
+
+        var options = {
+          title: \'' . $title . '\',
+          curveType: \'function\',
+           ' . $options . '
+          legend: { position: \'bottom\' }
+        };
+
+        var chart = new google.visualization.LineChart(document.getElementById(\'' . $containerId . '\'));
+
+        chart.draw(data, options);
+      }
+        ';
+        $result.=wf_tag('script', true);
+        $result.= wf_tag('div', false, '', 'id="' . $containerId . '" style="width: ' . $width . '; height: ' . $height . ';"') . wf_tag('div', true);
+    }
+
+    return ($result);
 }
 
 ?>

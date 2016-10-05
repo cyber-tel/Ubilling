@@ -321,6 +321,28 @@ a:hover {
 	padding: 1px 1px 1px 1px;
 }
 
+.row4 {
+    background-color: #ECECEC;
+    padding: 1px;
+}
+
+table.sortable.id tbody {
+    counter-reset: sortabletablescope;
+}
+table.sortable.id thead tr::before {
+    text-align: center;
+    vertical-align: middle;
+    content: "ID";
+    display: table-cell;
+}
+table.sortable.id tbody tr::before {
+    text-align: center;
+    vertical-align: middle;
+    content: counter(sortabletablescope);
+    counter-increment: sortabletablescope;
+    display: table-cell;
+}
+
 div.dhtml_menu div.vert_menu
 {
 	position: absolute;
@@ -635,6 +657,11 @@ height: 100px;
     color: #FFFFFF;
 }
 
+.sigcemeteryuser {
+    background-color: #444444;
+    color: #FFFFFF;
+}
+
 
 /* Alerts */
 
@@ -825,3 +852,12 @@ margin-top: -130px;
 .ubimcontact:link {
     color: #777777;
 }        
+
+.wh_viewer td {
+    padding: 4px;
+}
+
+.donetask {
+    background-color: #3366cc;
+    color: #ffffff;
+}

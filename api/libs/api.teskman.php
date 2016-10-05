@@ -52,7 +52,7 @@ function em_EmployeeShowForm() {
     $addForm = wf_Form("", 'POST', $inputs, '');
     $rows.=$addForm;
 
-    $result = wf_TableBody($rows, '100%', '0', 'sortable');
+    $result = wf_TableBody($rows, '100%', '0', '');
 
     show_window(__('Employee'), $result);
 }
@@ -752,7 +752,7 @@ function ts_JGetAllTasks() {
     if ($displaytype == 'onlyme') {
         $whoami = whoami();
         $curempid = ts_GetEmployeeByLogin($whoami);
-        $appendQuery = " WHERE `employee`='" . $curempid . "'";
+        $appendQuery = " AND `employee`='" . $curempid . "'";
     } else {
         $appendQuery = '';
     }
@@ -760,6 +760,9 @@ function ts_JGetAllTasks() {
     if (($curmonth != 1) AND ( $curmonth != 12)) {
         $query = "SELECT * from `taskman` WHERE `startdate` LIKE '" . $curyear . "-%' " . $appendQuery . " ORDER BY `date` ASC";
     } else {
+        if ($appendQuery) {
+            $appendQuery = str_replace('AND', 'WHERE', $appendQuery);
+        }
         $query = "SELECT * from `taskman` " . $appendQuery . " ORDER BY `date` ASC";
     }
 
@@ -937,6 +940,7 @@ function ts_TaskCreateForm() {
 
 /**
  * Returns task creation form for userprofile usage
+ * DEPRECATED: use ts_TaskCreateFormUnified instead this
  * 
  * @param string $address
  * @param string $mobile
@@ -956,17 +960,105 @@ function ts_TaskCreateFormProfile($address, $mobile, $phone, $login) {
         $smsInputs = '';
     }
 
+    $sup = wf_tag('sup', false) . '*' . wf_tag('sup', true);
+
     $inputs = '<!--ugly hack to prevent datepicker autoopen --> <input type="text" name="shittyhack" style="width: 0; height: 0; top: -100px; position: absolute;"/>';
     $inputs.=wf_HiddenInput('createtask', 'true');
     $inputs.=wf_DatePicker('newstartdate');
     $inputs.=wf_TimePickerPreset('newstarttime', '', '', false);
-    $inputs.=wf_tag('label') . __('Target date') . wf_tag('sup') . '*' . wf_tag('sup', true) . wf_tag('label', true);
+    $inputs.=wf_tag('label') . __('Target date') . $sup . wf_tag('label', true);
     $inputs.=wf_delimiter();
-    $inputs.=wf_TextInput('newtaskaddress', __('Address') . '<sup>*</sup>', $address, true, '30');
+    $inputs.=wf_TextInput('newtaskaddress', __('Address') . $sup, $address, true, '30');
     //hidden for new task login input
     $inputs.=wf_HiddenInput('newtasklogin', $login);
     $inputs.=wf_tag('br');
-    $inputs.=wf_TextInput('newtaskphone', __('Phone') . '<sup>*</sup>', $mobile . ' ' . $phone, true, '30');
+    $inputs.=wf_TextInput('newtaskphone', __('Phone') . $sup, $mobile . ' ' . $phone, true, '30');
+    $inputs.=wf_tag('br');
+    $inputs.=wf_Selector('newtaskjobtype', $alljobtypes, __('Job type'), '', true);
+    $inputs.=wf_tag('br');
+    $inputs.=wf_Selector('newtaskemployee', $allemployee, __('Who should do'), '', true);
+    $inputs.=wf_tag('br');
+    $inputs.=wf_tag('label') . __('Job note') . wf_tag('label', true) . wf_tag('br');
+    $inputs.=ts_TaskTypicalNotesSelector();
+    $inputs.=wf_TextArea('newjobnote', '', '', true, '35x5');
+    $inputs.=$smsInputs;
+    $inputs.=wf_Submit(__('Create new task'));
+    if (!empty($login)) {
+        $inputs.=wf_AjaxLoader();
+        $inputs.=' ' . wf_AjaxLink('?module=prevtasks&username=' . $login, wf_img_sized('skins/icon_search_small.gif', __('Previous user tasks')), 'taskshistorycontainer', false, '');
+        $inputs.=wf_tag('br');
+        $inputs.=wf_tag('div', false, '', 'id="taskshistorycontainer"') . wf_tag('div', true);
+    }
+    $result = wf_Form("?module=taskman&gotolastid=true", 'POST', $inputs, 'glamour');
+    $result.=__('All fields marked with an asterisk are mandatory');
+    return ($result);
+}
+
+/**
+ * Renders list of all previous user tasks by current year
+ * 
+ * @param string $login
+ * 
+ * @return string
+ */
+function ts_PreviousUserTasksRender($login) {
+    $result = '';
+    if (!empty($login)) {
+        $alljobtypes = ts_GetAllJobtypes();
+        $allemployee = ts_GetActiveEmployee();
+        $dateMask=date("Y").'-%';
+        
+        $query = "SELECT * from `taskman` WHERE `login`='" . $login . "' AND `date` LIKE '".$dateMask."' ORDER BY `id` DESC;";
+        $allTasks = simple_queryall($query);
+        if (!empty($allTasks)) {
+            $result.=wf_tag('hr');
+            foreach ($allTasks as $io => $each) {
+                $taskColor=($each['status']) ? 'donetask' : 'undone';
+                $result.=wf_tag('div', false, $taskColor, 'style="width:400px;"');
+                $taskdata=$each['startdate'].' - '.@$alljobtypes[$each['jobtype']].', '.@$allemployee[$each['employee']];
+                $result.= wf_link('?module=taskman&edittask='.$each['id'],  wf_img('skins/icon_edit.gif')).' '.$taskdata;
+                $result.= wf_tag('div', true);
+            }
+        }
+    }
+    return ($result);
+}
+
+/**
+ * Returns task creation form unified (use this shit in your further code!)
+ * 
+ * @param string $address
+ * @param string $mobile
+ * @param string $phone
+ * @param string $login
+ * @return  string
+ */
+function ts_TaskCreateFormUnified($address, $mobile, $phone, $login = '') {
+    global $ubillingConfig;
+    $altercfg = $ubillingConfig->getAlter();
+    $alljobtypes = ts_GetAllJobtypes();
+    $allemployee = ts_GetActiveEmployee();
+
+    //construct sms sending inputs
+    if ($altercfg['WATCHDOG_ENABLED']) {
+        $smsInputs = wf_CheckInput('newtasksendsms', __('Send SMS'), false, false);
+    } else {
+        $smsInputs = '';
+    }
+
+    $sup = wf_tag('sup') . '*' . wf_tag('sup', true);
+
+    $inputs = '<!--ugly hack to prevent datepicker autoopen -->';
+    $inputs.= wf_tag('input', false, '', 'type="text" name="shittyhack" style="width: 0; height: 0; top: -100px; position: absolute;"');
+    $inputs.=wf_HiddenInput('createtask', 'true');
+    $inputs.=wf_DatePicker('newstartdate');
+    $inputs.=wf_TimePickerPreset('newstarttime', '', '', false);
+    $inputs.=wf_tag('label') . __('Target date') . $sup . wf_tag('label', true);
+    $inputs.=wf_delimiter();
+    $inputs.=wf_TextInput('newtaskaddress', __('Address') . $sup, $address, true, '30');
+    $inputs.=wf_HiddenInput('newtasklogin', $login);
+    $inputs.=wf_tag('br');
+    $inputs.=wf_TextInput('newtaskphone', __('Phone') . $sup, $mobile . ' ' . $phone, true, '30');
     $inputs.=wf_tag('br');
     $inputs.=wf_Selector('newtaskjobtype', $alljobtypes, __('Job type'), '', true);
     $inputs.=wf_tag('br');
@@ -984,6 +1076,7 @@ function ts_TaskCreateFormProfile($address, $mobile, $phone, $login) {
 
 /**
  * Returns task creation form for sigreq usage
+ * DEPRECATED: use ts_TaskCreateFormUnified instead this
  * 
  * @param string $address
  * @param string $phone
@@ -1037,8 +1130,14 @@ function ts_ShowPanel() {
     $result = wf_modal(wf_img('skins/add_icon.png') . ' ' . __('Create task'), __('Create task'), $createform, 'ubButton', '450', '550');
     $result.=wf_Link('?module=taskman&show=undone', wf_img('skins/undone_icon.png') . ' ' . __('Undone tasks'), false, 'ubButton');
     $result.=wf_Link('?module=taskman&show=done', wf_img('skins/done_icon.png') . ' ' . __('Done tasks'), false, 'ubButton');
-    $result.=wf_Link('?module=taskman&show=all', wf_img('skins/icon_calendar.gif') . ' ' . __('List all tasks'), false, 'ubButton');
-    $result.=wf_Link('?module=taskman&lateshow=true', wf_img('skins/time_machine.png') . ' ' . __('Show late'), false, 'ubButton');
+    $result.=wf_Link('?module=taskman&show=all', wf_img('skins/icon_calendar.gif') . ' ' . __('All tasks'), false, 'ubButton');
+    if (cfr('TASKMANSEARCH')) {
+        $result.=wf_Link('?module=tasksearch', web_icon_search() . ' ' . __('Tasks search'), false, 'ubButton');
+    }
+
+    if (cfr('TASKMANTRACK')) {
+        $result.=wf_Link('?module=taskmantrack', wf_img('skins/track_icon.png') . ' ' . __('Tracking'), false, 'ubButton');
+    }
     $result.=wf_Link('?module=taskman&print=true', wf_img('skins/icon_print.png') . ' ' . __('Tasks printing'), false, 'ubButton');
 
     //show type selector
@@ -1106,7 +1205,6 @@ function ts_FlushSMSData($taskid) {
     log_register('TASKMAN FLUSH SMS [' . $taskid . ']');
 }
 
-
 /**
  * Creates new task in database
  * 
@@ -1150,16 +1248,18 @@ function ts_CreateTask($startdate, $starttime, $address, $login, $phone, $jobtyp
             if (!empty($smsDataRaw)) {
                 $smsData = serialize($smsDataRaw);
                 $smsData = "'" . base64_encode($smsData) . "'";
-                //flushing darkvoid
-                $darkVoid = new DarkVoid();
-                $darkVoid->flushCache();
             }
         }
     }
-    
+
     $query = "INSERT INTO `taskman` (`id` , `date` , `address` , `login` , `jobtype` , `jobnote` , `phone` , `employee` , `employeedone` ,`donenote` , `startdate` ,`starttime`, `enddate` , `admin` , `status`,`smsdata`)
-              VALUES (NULL , '" . $curdate . "', '" . $address . "', '" . $login . "', '" . $jobtypeid . "', '" . $jobnote . "', '" . $phone . "', '" . $employeeid . "','NULL', NULL , '" . $startdate . "'," . $starttime . ",NULL , '" . $admin . "', '0'," . $smsData . ");";
+              VALUES (NULL , '" . $curdate . "', '" . $address . "', '" . $login . "', '" . $jobtypeid . "', '" . $jobnote . "', '" . $phone . "', '" . $employeeid . "',NULL, NULL , '" . $startdate . "'," . $starttime . ",NULL , '" . $admin . "', '0'," . $smsData . ");";
     nr_query($query);
+
+    //flushing darkvoid
+    $darkVoid = new DarkVoid();
+    $darkVoid->flushCache();
+
     log_register("TASKMAN CREATE `" . $address . "`");
 }
 
@@ -1195,7 +1295,11 @@ function ts_TaskModifyForm($taskid) {
     if (!empty($taskdata)) {
         $inputs = wf_HiddenInput('modifytask', $taskid);
         $inputs.='<!--ugly hack to prevent datepicker autoopen --> <input type="text" name="shittyhackmod" style="width: 0; height: 0; top: -100px; position: absolute;"/>';
-        $inputs.=wf_DatePickerPreset('modifystartdate', $taskdata['startdate']);
+        if (cfr('TASKMANDATE')) {
+            $inputs.=wf_DatePickerPreset('modifystartdate', $taskdata['startdate']);
+        } else {
+            $inputs.=wf_HiddenInput('modifystartdate', $taskdata['startdate']);
+        }
         $inputs.=wf_TimePickerPreset('modifystarttime', $taskdata['starttime'], '', false);
         $inputs.=wf_tag('label') . __('Target date') . wf_tag('sup') . '*' . wf_tag('sup', true) . wf_tag('label', true);
         $inputs.=wf_delimiter();
@@ -1287,6 +1391,7 @@ function ts_TaskChangeForm($taskid) {
     $allemployee = ts_GetAllEmployee();
     $activeemployee = ts_GetActiveEmployee();
     $alljobtypes = ts_GetAllJobtypes();
+    $messages = new UbillingMessageHelper();
     $smsData = '';
 
     if (!empty($taskdata)) {
@@ -1319,7 +1424,11 @@ function ts_TaskChangeForm($taskid) {
         }
 
         //modify form handlers
-        $modform = wf_modal(web_edit_icon(), __('Edit'), ts_TaskModifyForm($taskid), '', '450', '550');
+        $modform = '';
+        if (cfr('TASKMANTRACK')) {
+            $modform.= wf_Link('?module=taskmantrack&trackid=' . $taskid, wf_img('skins/track_icon.png', __('Track this task')));
+        }
+        $modform.= wf_modal(web_edit_icon(), __('Edit'), ts_TaskModifyForm($taskid), '', '450', '550');
         //modform end
         //extracting sms data
         if (!empty($taskdata['smsdata'])) {
@@ -1371,9 +1480,13 @@ function ts_TaskChangeForm($taskid) {
             }
         }
 
-        $tablecells = wf_TableCell(__('Task creation date') . ' / ' . __('Administrator'), '30%');
-        $tablecells.= wf_TableCell($taskdata['date'] . ' / ' . $taskdata['admin']);
+        $tablecells = wf_TableCell(__('ID'), '30%');
+        $tablecells.= wf_TableCell($taskdata['id']);
         $tablerows = wf_TableRow($tablecells, 'row3');
+
+        $tablecells = wf_TableCell(__('Task creation date') . ' / ' . __('Administrator'));
+        $tablecells.= wf_TableCell($taskdata['date'] . ' / ' . $taskdata['admin']);
+        $tablerows.= wf_TableRow($tablecells, 'row3');
 
         $tablecells = wf_TableCell(__('Target date'));
         $tablecells.= wf_TableCell(wf_tag('strong') . $taskdata['startdate'] . ' ' . $taskdata['starttime'] . wf_tag('strong', true));
@@ -1408,6 +1521,23 @@ function ts_TaskChangeForm($taskid) {
         // show task preview
         show_window(__('View task') . ' ' . $modform, $result);
 
+        //Salary accounting
+        if ($altercfg['SALARY_ENABLED']) {
+            if (cfr('SALARYTASKSVIEW')) {
+                $salary = new Salary();
+                show_window(__('Additional jobs done'), $salary->taskJobCreateForm($_GET['edittask']));
+            }
+        }
+
+        //warehouse integration
+        if ($altercfg['WAREHOUSE_ENABLED']) {
+            if (cfr('WAREHOUSE')) {
+                $warehouse = new Warehouse();
+                show_window(__('Additionally spent materials'), $warehouse->taskMaterialsReport($_GET['edittask']));
+            }
+        }
+
+
         //if task undone
         if ($taskdata['status'] == 0) {
             $sup = wf_tag('sup') . '*' . wf_tag('sup', false);
@@ -1425,8 +1555,15 @@ function ts_TaskChangeForm($taskid) {
 
             $form = wf_Form("", 'POST', $inputs, 'glamour');
 
+            if (cfr('TASKMANDELETE')) {
+                show_window('', wf_JSAlertStyled('?module=taskman&deletetask=' . $taskid, web_delete_icon() . ' ' . __('Remove this task - it is an mistake'), $messages->getDeleteAlert(), 'ubButton'));
+            }
+
+
             //show editing form
-            show_window(__('If task is done'), $form);
+            if (cfr('TASKMANDONE')) {
+                show_window(__('If task is done'), $form);
+            }
         } else {
             $donecells = wf_TableCell(__('Finish date'), '30%');
             $donecells.=wf_TableCell($taskdata['enddate']);
@@ -1441,9 +1578,16 @@ function ts_TaskChangeForm($taskid) {
             $donerows.=wf_TableRow($donecells, 'row3');
 
             $doneresult = wf_TableBody($donerows, '100%', '0', 'glamour');
-            $doneresult.=wf_JSAlert('?module=taskman&deletetask=' . $taskid, web_delete_icon(__('Remove this task - it is an mistake')), __('Removing this may lead to irreparable results'));
-            $doneresult.='&nbsp;';
-            $doneresult.=wf_JSAlert('?module=taskman&setundone=' . $taskid, wf_img('skins/icon_key.gif', __('No work was done')), __('Are you serious'));
+
+            if (cfr('TASKMANDELETE')) {
+                $doneresult.=wf_JSAlertStyled('?module=taskman&deletetask=' . $taskid, web_delete_icon() . ' ' . __('Remove this task - it is an mistake'), $messages->getDeleteAlert(), 'ubButton');
+            }
+
+            if (cfr('TASKMANDONE')) {
+                $doneresult.='&nbsp;';
+                $doneresult.=wf_JSAlertStyled('?module=taskman&setundone=' . $taskid, wf_img('skins/icon_key.gif') . ' ' . __('No work was done'), $messages->getEditAlert(), 'ubButton');
+            }
+
 
             show_window(__('Task is done'), $doneresult);
         }
@@ -1635,7 +1779,7 @@ function ts_PrintTasks($datefrom, $dateto) {
 }
 
 /**
- * Returns list of expired undeone tasks
+ * Returns list of expired undone tasks
  * 
  * @return string
  */
@@ -1693,6 +1837,82 @@ function ts_GetEmployeeByLogin($login) {
         $result = $raw['id'];
     } else {
         $result = false;
+    }
+    return ($result);
+}
+
+/**
+ * Returns count of undone tasks - used by DarkVoid
+ * 
+ * @return int
+ */
+function ts_GetUndoneCountersAll() {
+    $result = 0;
+    $curdate = curdate();
+    $curyear = curyear();
+    $query = "SELECT `id` from `taskman` WHERE `status` = '0' AND `startdate` <= '" . $curdate . "' AND `date` LIKE '" . $curyear . "-%';";
+    $allundone = simple_queryall($query);
+    if (!empty($allundone)) {
+        $result = sizeof($allundone);
+    }
+    return ($result);
+}
+
+/**
+ * Returns count of undone tasks - used by DarkVoid
+ * 
+ * @return array
+ */
+function ts_GetUndoneTasksArray($year = '') {
+    $result = array();
+    $curdate = curdate();
+    $curyear = (!empty($year)) ? $year : curyear();
+    $query = "SELECT * from `taskman` WHERE `status` = '0' AND `startdate` <= '" . $curdate . "'";
+    $all = simple_queryall($query);
+    if (!empty($all)) {
+        foreach ($all as $io => $each) {
+            $result[$each['id']] = $each;
+        }
+    }
+    return ($result);
+}
+
+/**
+ * Returns count of undone tasks only for current admin login - used by DarkVoid
+ * 
+ * @return int
+ */
+function ts_GetUndoneCountersMy() {
+    $result = 0;
+    $curdate = curdate();
+    $curyear = curyear();
+    $mylogin = whoami();
+    $adminQuery = "SELECT `id` from `employee` WHERE `admlogin`='" . $mylogin . "'";
+    $adminId = simple_query($adminQuery);
+    if (!empty($adminId)) {
+        $adminId = $adminId['id'];
+        $query = "SELECT `id` from `taskman` WHERE `employee`='" . $adminId . "' AND `status` = '0' AND `startdate` <= '" . $curdate . "' AND `date` LIKE '" . $curyear . "-%';";
+        $allundone = simple_queryall($query);
+        if (!empty($allundone)) {
+            $result = sizeof($allundone);
+        }
+    }
+    return ($result);
+}
+
+/**
+ * Returns all of available tasks as id=>data
+ * 
+ * @return array
+ */
+function ts_GetAllTasks() {
+    $result = array();
+    $query = "SELECT * from `taskman`";
+    $all = simple_queryall($query);
+    if (!empty($all)) {
+        foreach ($all as $io => $each) {
+            $result[$each['id']] = $each;
+        }
     }
     return ($result);
 }

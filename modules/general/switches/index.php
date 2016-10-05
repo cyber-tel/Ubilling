@@ -25,6 +25,24 @@ if (isset($_GET['cronping'])) {
 
 if (cfr('SWITCHES')) {
     $altCfg = $ubillingConfig->getAlter();
+    
+    //icmp ping handling
+    if (wf_CheckGet(array('backgroundicmpping'))) {
+        $billingConf=$ubillingConfig->getBilling();
+        $command=$billingConf['SUDO'].' '.$billingConf['PING'].' -i 0.01 -c 10  '.$_GET['backgroundicmpping'];
+        $icmpPingResult=shell_exec($command);
+        die(wf_tag('pre').$icmpPingResult.  wf_tag('pre',true));
+    }
+    
+    //switch by IP detecting
+    if (wf_CheckGet(array('gotoswitchbyip'))) {
+        $detectSwitchId=  zb_SwitchGetIdbyIP($_GET['gotoswitchbyip']);
+        if ($detectSwitchId) {
+            rcms_redirect('?module=switches&edit='.$detectSwitchId);
+        } else {
+            show_warning(__('Strange exeption').': NO_SUCH_IP');
+        }
+    }
 
 //switch adding
     if (isset($_POST['newswitchmodel'])) {
@@ -85,6 +103,11 @@ if (cfr('SWITCHES')) {
             $swlinks.=wf_Link('?module=switchmap', wf_img('skins/ymaps/network.png') . ' ' . __('Switches map'), false, 'ubButton');
         }
 
+        if($altCfg['SWITCH_AUTOCONFIG']) {
+            if(cfr(SwitchLogin::MODULE)) {
+                $swlinks.=wf_Link(SwitchLogin::MODULE_URL, wf_img('skins/sw_login.png') . ' ' . __('Switch login'), false, 'ubButton');
+            }
+        }
         //parental switch deletion alternate controls
         if (isset($_GET['switchdelete'])) {
             $swlinks = '';
@@ -118,8 +141,10 @@ if (cfr('SWITCHES')) {
                 $timeMachineCleanupControl = wf_JSAlert('?module=switches&timemachine=true&flushalldead=true', wf_img('skins/icon_cleanup.png', __('Cleanup')), __('Are you serious'));
                 //here some searchform
                 $timeMachineSearchForm = web_SwitchTimeMachineSearchForm() . wf_tag('br');
-
+                
                 show_window(__('Dead switches time machine') . ' ' . $timeMachineCleanupControl, $timeMachineSearchForm . $timeMachine);
+                show_window(__('Dead switches top'),web_DeadSwitchesTop());
+                
             } else {
                 //showing dead switches snapshot
                 ub_SwitchesTimeMachineShowSnapshot($_GET['snapshot']);

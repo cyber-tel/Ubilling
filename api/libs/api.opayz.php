@@ -224,7 +224,7 @@ class OpenPayz {
                 }
 
                 //current month stats
-                if (ispos($date, $curMonth.'-')) {
+                if (ispos($date, $curMonth . '-')) {
                     if (isset($gcMonthData[$each['paysys']])) {
                         $gcMonthData[$each['paysys']] ++;
                     } else {
@@ -233,22 +233,23 @@ class OpenPayz {
                 }
             }
         }
+        $chartOpts = "chartArea: {  width: '90%', height: '90%' }, legend : {position: 'right'}, ";
 
         if (!empty($gcAllData)) {
-            $gcAllPie=wf_gcharts3DPie($gcAllData, __('All time'), '500px', '300px');
+            $gcAllPie = wf_gcharts3DPie($gcAllData, __('All time'), '400px', '400px', $chartOpts);
         } else {
-            $gcAllPie='';
+            $gcAllPie = '';
         }
-        
+
         if (!empty($gcMonthData)) {
-            $gcMonthPie=wf_gcharts3DPie($gcMonthData, __('Current month'), '500px', '300px');
+            $gcMonthPie = wf_gcharts3DPie($gcMonthData, __('Current month'), '400px', '400px', $chartOpts);
         } else {
-            $gcMonthPie='';
+            $gcMonthPie = '';
         }
-        
-        $gcells=  wf_TableCell($gcAllPie);
+
+        $gcells = wf_TableCell($gcAllPie);
         $gcells.= wf_TableCell($gcMonthPie);
-        $grows= wf_TableRow($gcells);
+        $grows = wf_TableRow($gcells);
         $result.=wf_TableBody($grows, '100%', 0, '');
 
 
@@ -342,12 +343,13 @@ class OpenPayz {
                 @$user_login = $this->allCustomers[$eachtransaction['customerid']];
                 @$user_realname = $this->allRealnames[$user_login];
                 $user_realname = str_replace('"', '', $user_realname);
+                $user_realname = str_replace('\\', '', $user_realname);
                 $user_realname = trim($user_realname);
 
                 @$user_address = $this->allAddress[$user_login];
-                $user_address = str_replace('"', '', $user_address);
-                $user_address =  addslashes($user_address);
                 $user_address = trim($user_address);
+                $user_address = str_replace("'", '`', $user_address);
+                $user_address = mysql_real_escape_string($user_address);
 
 
                 if (!empty($user_login)) {

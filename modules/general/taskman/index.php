@@ -1,6 +1,7 @@
 <?php
 
 if (cfr('TASKMAN')) {
+    $altCfg = $ubillingConfig->getAlter();
 
     //if someone creates new task
     if (isset($_POST['createtask'])) {
@@ -23,7 +24,7 @@ if (cfr('TASKMAN')) {
                 show_error(__('Wrong date format'));
             }
         } else {
-            show_window(__('Error'), __('All fields marked with an asterisk are mandatory'));
+            show_error(__('All fields marked with an asterisk are mandatory'));
         }
     }
 
@@ -32,14 +33,14 @@ if (cfr('TASKMAN')) {
     if (isset($_POST['modifytask'])) {
         if (wf_CheckPost(array('modifystartdate', 'modifytaskaddress', 'modifytaskphone'))) {
             if (zb_checkDate($_POST['modifystartdate'])) {
-            $taskid = $_POST['modifytask'];
-            ts_ModifyTask($taskid, $_POST['modifystartdate'], $_POST['modifystarttime'], $_POST['modifytaskaddress'], @$_POST['modifytasklogin'], $_POST['modifytaskphone'], $_POST['modifytaskjobtype'], $_POST['modifytaskemployee'], $_POST['modifytaskjobnote']);
-            rcms_redirect("?module=taskman&edittask=" . $taskid);
+                $taskid = $_POST['modifytask'];
+                ts_ModifyTask($taskid, $_POST['modifystartdate'], $_POST['modifystarttime'], $_POST['modifytaskaddress'], @$_POST['modifytasklogin'], $_POST['modifytaskphone'], $_POST['modifytaskjobtype'], $_POST['modifytaskemployee'], $_POST['modifytaskjobnote']);
+                rcms_redirect("?module=taskman&edittask=" . $taskid);
             } else {
                 show_error(__('Wrong date format'));
             }
         } else {
-            show_window(__('Error'), __('All fields marked with an asterisk are mandatory'));
+            show_error(__('All fields marked with an asterisk are mandatory'));
         }
     }
 
@@ -47,23 +48,29 @@ if (cfr('TASKMAN')) {
     if (isset($_POST['changetask'])) {
         if (wf_CheckPost(array('editenddate', 'editemployeedone'))) {
             if (zb_checkDate($_POST['editenddate'])) {
-            //editing task sub
-            $editid = vf($_POST['changetask']);
-            simple_update_field('taskman', 'enddate', $_POST['editenddate'], "WHERE `id`='" . $editid . "'");
-            simple_update_field('taskman', 'employeedone', $_POST['editemployeedone'], "WHERE `id`='" . $editid . "'");
-            simple_update_field('taskman', 'donenote', $_POST['editdonenote'], "WHERE `id`='" . $editid . "'");
-            simple_update_field('taskman', 'status', '1', "WHERE `id`='" . $editid . "'");
-            log_register('TASKMAN DONE [' . $editid . ']');
-            //generate job for some user
-            if (wf_CheckPost(array('generatejob', 'generatelogin', 'generatejobid'))) {
-                stg_add_new_job($_POST['generatelogin'], curdatetime(), $_POST['editemployeedone'], $_POST['generatejobid'], 'TASKID:[' . $_POST['changetask'] . ']');
-                log_register("TASKMAN GENJOB (" . $_POST['generatelogin'] . ') VIA [' . $_POST['changetask'] . ']');
-            }
+                //editing task sub
+                $editid = vf($_POST['changetask']);
+                simple_update_field('taskman', 'enddate', $_POST['editenddate'], "WHERE `id`='" . $editid . "'");
+                simple_update_field('taskman', 'employeedone', $_POST['editemployeedone'], "WHERE `id`='" . $editid . "'");
+                simple_update_field('taskman', 'donenote', $_POST['editdonenote'], "WHERE `id`='" . $editid . "'");
+                simple_update_field('taskman', 'status', '1', "WHERE `id`='" . $editid . "'");
+
+                //flushing darkvoid after changing task
+                $darkVoid = new DarkVoid();
+                $darkVoid->flushCache();
+
+                log_register('TASKMAN DONE [' . $editid . ']');
+
+                //generate job for some user
+                if (wf_CheckPost(array('generatejob', 'generatelogin', 'generatejobid'))) {
+                    stg_add_new_job($_POST['generatelogin'], curdatetime(), $_POST['editemployeedone'], $_POST['generatejobid'], 'TASKID:[' . $_POST['changetask'] . ']');
+                    log_register("TASKMAN GENJOB (" . $_POST['generatelogin'] . ') VIA [' . $_POST['changetask'] . ']');
+                }
             } else {
                 show_error(__('Wrong date format'));
             }
         } else {
-            show_window(__('Error'), __('All fields marked with an asterisk are mandatory'));
+            show_error(__('All fields marked with an asterisk are mandatory'));
         }
     }
 
@@ -73,6 +80,12 @@ if (cfr('TASKMAN')) {
         simple_update_field('taskman', 'status', '0', "WHERE `id`='" . $undid . "'");
         simple_update_field('taskman', 'enddate', 'NULL', "WHERE `id`='" . $undid . "'");
         log_register("TASKMAN UNDONE [" . $undid . ']');
+
+        //flushing darkvoid after setting task as undone
+        $darkVoid = new DarkVoid();
+        $darkVoid->flushCache();
+
+
         rcms_redirect("?module=taskman");
     }
 
@@ -81,6 +94,9 @@ if (cfr('TASKMAN')) {
     if (isset($_GET['deletetask'])) {
         $delid = vf($_GET['deletetask'], 3);
         ts_DeleteTask($delid);
+        //flushing darkvoid after task deletion
+        $darkVoid = new DarkVoid();
+        $darkVoid->flushCache();
         rcms_redirect("?module=taskman");
     }
 
@@ -143,10 +159,45 @@ if (cfr('TASKMAN')) {
                 rcms_redirect('?module=taskman&edittask=' . $_GET['flushsmsdata']);
             }
 
+            /**
+             * Salary accounting actions
+             */
+            if ($altCfg['SALARY_ENABLED']) {
+                $salary = new Salary();
+                //salary job deletion
+                if (wf_CheckGet(array('deletejobid'))) {
+                    $salary->deleteJob($_GET['deletejobid']);
+                    rcms_redirect($salary::URL_TS . $_GET['edittask']);
+                }
+
+                //salary job editing
+                if (wf_CheckPost(array('editsalaryjobid', 'editsalaryemployeeid', 'editsalaryjobtypeid'))) {
+                    $salary->jobEdit($_POST['editsalaryjobid'], $_POST['editsalaryemployeeid'], $_POST['editsalaryjobtypeid'], $_POST['editsalaryfactor'], $_POST['editsalaryoverprice'], $_POST['editsalarynotes']);
+                    rcms_redirect($salary::URL_TS . $_GET['edittask']);
+                }
+
+                //salary job creation
+                if (wf_CheckPost(array('newsalarytaskid', 'newsalaryemployeeid', 'newsalaryjobtypeid'))) {
+                    $salary->createSalaryJob($_POST['newsalarytaskid'], $_POST['newsalaryemployeeid'], $_POST['newsalaryjobtypeid'], $_POST['newsalaryfactor'], $_POST['newsalaryoverprice'], $_POST['newsalarynotes']);
+                    rcms_redirect($salary::URL_TS . $_GET['edittask']);
+                }
+            }
+
+
+
             //display task change form
             ts_TaskChangeForm($_GET['edittask']);
+
+            //photostorage integration
+            if ($altCfg['PHOTOSTORAGE_ENABLED']) {
+                $photoStorage = new PhotoStorage('TASKMAN', $_GET['edittask']);
+                $photostorageControl = wf_Link('?module=photostorage&scope=TASKMAN&mode=list&itemid=' . $_GET['edittask'], wf_img('skins/photostorage.png') . ' ' . __('Upload images'), false, 'ubButton');
+                $photostorageControl.=wf_delimiter();
+                $photosList = $photoStorage->renderImagesRaw();
+                show_window(__('Photostorage'), $photostorageControl . $photosList);
+            }
+
             //additional comments 
-            $altCfg = $ubillingConfig->getAlter();
             if ($altCfg['ADCOMMENTS_ENABLED']) {
                 $adcomments = new ADcomments('TASKMAN');
                 show_window(__('Additional comments'), $adcomments->renderComments($_GET['edittask']));

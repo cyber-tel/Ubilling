@@ -174,6 +174,7 @@ function zb_AddressDeleteStreet($streetid) {
  */
 function zb_AddressChangeStreetName($streetid, $streetname) {
     $streetid = vf($streetid, 3);
+    $streetname = zb_AddressFilterStreet($streetname);
     $streetname = mysql_real_escape_string($streetname);
     $query = "UPDATE `street` SET `streetname` = '" . $streetname . "' WHERE `id`= '" . $streetid . "' ;";
     nr_query($query);
@@ -608,9 +609,9 @@ function web_CitySelector() {
             $allcity[$each['id']] = $each['cityname'];
         }
     }
-    
-    $selected= (wf_CheckGet(array('citypreset'))) ? vf($_GET['citypreset'],3) : '' ;
-    
+
+    $selected = (wf_CheckGet(array('citypreset'))) ? vf($_GET['citypreset'], 3) : '';
+
     $selector = wf_Selector('citysel', $allcity, '', $selected, false);
     return ($selector);
 }
@@ -673,7 +674,7 @@ function web_StreetSelectorAc($cityid) {
     }
 
     $selector = wf_SelectorAC('streetsel', $allstreets, '', '', false);
-    $selector.= wf_tag('a', false, '', 'href="?module=streets&citypreset='.$cityid.'" target="_BLANK"') . web_street_icon() . wf_tag('a', true);
+    $selector.= wf_tag('a', false, '', 'href="?module=streets&citypreset=' . $cityid . '" target="_BLANK"') . web_street_icon() . wf_tag('a', true);
 
     return ($selector);
 }
@@ -1208,6 +1209,63 @@ function zb_AddressGetFullCityaddresslist() {
     return($result);
 }
 
+/**
+ * Returns all user cities as  login=>city
+ * 
+ * @return array
+ */
+function zb_AddressGetCityUsers() {
+    $result = array();
+    $apts = array();
+    $builds = array();
+    $city_q = "SELECT * from `city`";
+    $adrz_q = "SELECT * from `address`";
+    $apt_q = "SELECT * from `apt`";
+    $build_q = "SELECT * from build";
+    $streets_q = "SELECT * from `street`";
+    $alladdrz = simple_queryall($adrz_q);
+    $allapt = simple_queryall($apt_q);
+    $allbuilds = simple_queryall($build_q);
+    $allstreets = simple_queryall($streets_q);
+    if (!empty($alladdrz)) {
+        $cities = zb_AddressGetFullCityNames();
+
+        foreach ($alladdrz as $io1 => $eachaddress) {
+            $address[$eachaddress['id']] = array('login' => $eachaddress['login'], 'aptid' => $eachaddress['aptid']);
+        }
+        foreach ($allapt as $io2 => $eachapt) {
+            $apts[$eachapt['id']] = array('apt' => $eachapt['apt'], 'buildid' => $eachapt['buildid']);
+        }
+        foreach ($allbuilds as $io3 => $eachbuild) {
+            $builds[$eachbuild['id']] = array('buildnum' => $eachbuild['buildnum'], 'streetid' => $eachbuild['streetid']);
+        }
+        foreach ($allstreets as $io4 => $eachstreet) {
+            $streets[$eachstreet['id']] = array('streetname' => $eachstreet['streetname'], 'cityid' => $eachstreet['cityid']);
+        }
+
+        foreach ($address as $io5 => $eachaddress) {
+            $cityid = $streets[$builds[$apts[$eachaddress['aptid']]['buildid']]['streetid']]['cityid'];
+
+            $result[$eachaddress['login']] = $cities[$cityid];
+        }
+    }
+
+    return($result);
+}
+
+/**
+ * Filters street name for special chars
+ * 
+ * @param string $name
+ * 
+ * @return string
+ */
+function zb_AddressFilterStreet($name) {
+    $name = str_replace('"', '``', $name);
+    $name = str_replace('\'', '`', $name);
+    return ($name);
+}
+
 /*
  * Build passport data base class
  */
@@ -1228,12 +1286,11 @@ class BuildPassport {
         $this->loadConfig();
     }
 
-    /*
+    /**
      * loads all existing builds passport data into private prop
      * 
      * @return void
      */
-
     protected function loadData() {
         $query = "SELECT * from `buildpassport`";
         $all = simple_queryall($query);
@@ -1244,12 +1301,11 @@ class BuildPassport {
         }
     }
 
-    /*
+    /**
      * load build passport data options
      * 
      * @return void
      */
-
     protected function loadConfig() {
         global $ubillingConfig;
         $altCfg = $ubillingConfig->getAlter();
@@ -1286,14 +1342,13 @@ class BuildPassport {
         }
     }
 
-    /*
+    /**
      * returns some build passport edit form
      * 
      * @praram $buildid existing build id
      * 
      * @return string
      */
-
     public function renderEditForm($buildid) {
 
         $buildid = vf($buildid, 3);
@@ -1324,12 +1379,11 @@ class BuildPassport {
         return ($result);
     }
 
-    /*
+    /**
      * saves new passport data for some build
      * 
      * @return void
      */
-
     protected function savePassport() {
         if (wf_CheckPost(array('savebuildpassport'))) {
             $buildid = vf($_POST['savebuildpassport'], 3);

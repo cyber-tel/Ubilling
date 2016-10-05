@@ -12,15 +12,21 @@ expect {
 	"(yes/no)?*" {
 		send "yes\r"
 		}
+}
+expect "Password:*"
+send "$password\r"
+expect {
+	"*>" {
+		send "enable\r"
+		expect "Password: *"
+		send "$password\r"
+		expect "*#"
+		send "configure terminal\r"
 	}
-expect "Password:"
-send "$password\r"
-expect "*>"
-send "enable\r"
-expect "Password:"
-send "$password\r"
-expect "*#"
-send "configure terminal\r"
+	"*#" {
+		send "configure terminal\r"
+	}
+}
 expect "*(config)#"
 send "vlan $vlan\r"
 expect "*(config-vlan)"
@@ -43,4 +49,3 @@ expect "*#"
 send "write\r"
 expect "*#"
 send "exit\r"
-expect eof

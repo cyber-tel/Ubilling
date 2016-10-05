@@ -356,7 +356,7 @@ class CustomMaps {
         if (!empty($data)) {
             foreach ($data as $io => $each) {
                 if (isset($each['Point'])) {
-                    $result[$i]['name'] = trim($each['name']);
+                    @$result[$i]['name'] = trim($each['name']);
                     $coordsRaw = trim($each['Point']['coordinates']);
                     $coordsRaw = explode(',', $coordsRaw);
                     $result[$i]['geo'] = $coordsRaw[1] . ', ' . $coordsRaw[0];
@@ -906,7 +906,7 @@ class CustomMaps {
 
         $result = $this->mapControls();
         $result.= $this->mapContainer();
-        $result.= wf_tag('script', false, '', 'src="http://api-maps.yandex.ru/2.0/?load=package.full&lang=' . $this->ymapsCfg['LANG'] . '"  type="text/javascript"');
+        $result.= wf_tag('script', false, '', 'src="https://api-maps.yandex.ru/2.0/?load=package.full&lang=' . $this->ymapsCfg['LANG'] . '"  type="text/javascript"');
         $result.=wf_tag('script', true);
         $result.=wf_tag('script', false, '', 'type="text/javascript"');
         $result.= '

@@ -1430,3 +1430,277 @@ CREATE TABLE IF NOT EXISTS `cudiscounts` (
   ) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
 
 ALTER TABLE `ukv_banksta` ADD `payid` INT NULL ; 
+
+-- 0.6.9 update
+
+CREATE TABLE IF NOT EXISTS `salary_jobs` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `date` datetime NOT NULL,
+  `state` tinyint(1) NOT NULL DEFAULT '0',
+  `taskid` int(11) DEFAULT NULL,
+  `employeeid` int(11) NOT NULL,
+  `jobtypeid` int(11) NOT NULL,
+  `factor` double DEFAULT NULL,
+  `overprice` double DEFAULT NULL,
+  `note` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+
+
+CREATE TABLE IF NOT EXISTS `salary_jobprices` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `jobtypeid` int(11) NOT NULL,
+  `price` double NOT NULL,
+  `unit` varchar(255) NOT NULL,
+  `time` int(11) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+
+
+CREATE TABLE IF NOT EXISTS `salary_wages` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `employeeid` int(11) NOT NULL,
+  `wage` double NOT NULL,
+  `bounty` double NOT NULL,
+  `worktime` int(11) NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+
+
+CREATE TABLE IF NOT EXISTS `salary_paid` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `jobid` int(11) NOT NULL,
+  `employeeid` int(11) NOT NULL,
+  `paid` double DEFAULT NULL,
+  `date` datetime NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+
+
+CREATE TABLE IF NOT EXISTS `salary_timesheets` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `date` date  NOT NULL,
+  `employeeid` int(11) NOT NULL,
+  `hours` int(11) NOT NULL DEFAULT '0',
+  `holiday` tinyint(1) NOT NULL DEFAULT '0',
+  `hospital` tinyint(1) NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+
+
+CREATE TABLE IF NOT EXISTS `cemetery` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `login` varchar(255) NOT NULL,
+  `state` tinyint(1) NOT NULL DEFAULT '0',
+  `date` datetime NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+
+
+-- 0.7.0 update
+CREATE TABLE IF NOT EXISTS `contacts` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `phone` varchar(255) NOT NULL,
+  `name` varchar(255) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+
+CREATE TABLE IF NOT EXISTS `wh_categories` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+
+CREATE TABLE IF NOT EXISTS `wh_itemtypes` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `categoryid` int(11) NOT NULL,
+  `name` varchar(255) NOT NULL,
+  `unit` varchar(40) NOT NULL,
+  `reserve` double DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `categoryid` (`categoryid`,`name`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+
+
+CREATE TABLE IF NOT EXISTS `wh_storages` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+
+
+CREATE TABLE IF NOT EXISTS `wh_contractors` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+
+
+CREATE TABLE IF NOT EXISTS `wh_in` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `date` date NOT NULL,
+  `itemtypeid` int(11) NOT NULL,
+  `contractorid` int(11) NOT NULL,
+  `count` double NOT NULL,
+  `barcode` varchar(255) DEFAULT NULL,
+  `price` double DEFAULT NULL,
+  `storageid` int(11) NOT NULL,
+  `notes` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `date` (`date`,`itemtypeid`,`contractorid`,`storageid`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+
+
+CREATE TABLE IF NOT EXISTS `wh_out` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `date` date NOT NULL,
+  `desttype` varchar(40) NOT NULL,
+  `destparam` varchar(255) NOT NULL,
+  `storageid` int(11) NOT NULL,
+  `itemtypeid` int(11) NOT NULL,
+  `count` double NOT NULL,
+  `price` double DEFAULT NULL,
+  `notes` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `date` (`date`,`storageid`,`itemtypeid`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+
+ALTER TABLE `taskman` CHANGE `employeedone` `employeedone` INT(11) NULL; 
+
+-- 0.7.1 update
+
+CREATE TABLE IF NOT EXISTS `wh_reserve` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `storageid` int(11) NOT NULL,
+  `itemtypeid` int(11) NOT NULL,
+  `count` double NOT NULL,
+  `employeeid` int(11) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `storageid` (`storageid`),
+  KEY `itemtypeid` (`itemtypeid`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+
+CREATE TABLE IF NOT EXISTS `friendship` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `friend` varchar(255) NOT NULL,
+  `parent` varchar(255) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `friend` (`friend`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+
+ALTER TABLE `taskman` ADD INDEX(`address`); 
+
+ALTER TABLE `taskman` ADD INDEX(`startdate`); 
+
+-- 0.7.2 update
+ALTER TABLE `switch_login` ADD `snmptemplate` VARCHAR(32) DEFAULT NULL;
+
+CREATE TABLE IF NOT EXISTS `taskmantrack` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `taskid` int(11) NOT NULL,
+  `admin` varchar(255) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `taskid` (`taskid`,`admin`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+
+CREATE TABLE IF NOT EXISTS `vlan_mac_history` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `login` varchar(45) DEFAULT NULL,
+  `vlan` int(4) DEFAULT NULL,
+  `mac` varchar(45) DEFAULT NULL,
+  `date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+
+-- 0.7.3 update
+
+CREATE TABLE IF NOT EXISTS `dealwithit` (
+ `id` int(11) NOT NULL AUTO_INCREMENT,
+ `date` date NOT NULL,
+ `login` varchar(45) NOT NULL,
+ `action` varchar(45) NOT NULL,
+ `param` varchar(45) DEFAULT NULL,
+ `note` varchar(45) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+
+CREATE TABLE IF NOT EXISTS `mg_tariffs` (
+ `id` int(11) NOT NULL AUTO_INCREMENT,
+ `name` varchar(255) NOT NULL,
+ `fee` double DEFAULT NULL,
+ `serviceid` varchar(45) DEFAULT NULL,
+ `primary` TINYINT(1) NOT NULL DEFAULT '0',
+ `freeperiod` TINYINT(1) NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+
+
+CREATE TABLE IF NOT EXISTS `mg_subscribers` (
+ `id` int(11) NOT NULL AUTO_INCREMENT,
+ `login` varchar(255) NOT NULL,
+ `tariffid`  int(11) NOT NULL,
+ `actdate` DATETIME NOT NULL,
+ `active` TINYINT(1) NOT NULL DEFAULT '0',
+ `primary` TINYINT(1) NOT NULL DEFAULT '0',
+ `freeperiod` TINYINT(1) NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+
+CREATE TABLE IF NOT EXISTS `mg_history` (
+ `id` int(11) NOT NULL AUTO_INCREMENT,
+ `login` varchar(255) NOT NULL,
+ `tariffid`  int(11) NOT NULL,
+ `actdate` DATETIME NOT NULL,
+ `freeperiod` TINYINT(1) NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+
+
+CREATE TABLE IF NOT EXISTS `mg_queue` (
+ `id` int(11) NOT NULL AUTO_INCREMENT,
+ `login` varchar(255) NOT NULL,
+ `date` DATETIME NOT NULL,
+ `action` varchar(45) NOT NULL,
+ `tariffid` int(11)  NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+
+-- 0.7.8
+
+CREATE TABLE IF NOT EXISTS `exhorse` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `date` datetime NOT NULL,
+  `u_totalusers` int(11) DEFAULT NULL,
+  `u_activeusers` int(11) DEFAULT NULL,
+  `u_inactiveusers` int(11) DEFAULT NULL,
+  `u_frozenusers` int(11) DEFAULT NULL,
+  `u_complextotal` int(11) DEFAULT NULL,
+  `u_complexactive` int(11) DEFAULT NULL,
+  `u_complexinactive` int(11) DEFAULT NULL,
+  `u_signups` int(11) DEFAULT NULL,
+  `u_citysignups` text,
+  `f_totalmoney` double DEFAULT NULL,
+  `f_paymentscount` int(11) DEFAULT NULL,
+  `f_arpu` double DEFAULT NULL,
+  `f_arpau` double DEFAULT NULL,
+  `c_totalusers` int(11) DEFAULT NULL,
+  `c_activeusers` int(11) DEFAULT NULL,
+  `c_inactiveusers` int(11) DEFAULT NULL,
+  `c_illegal` int(11) DEFAULT NULL,
+  `c_complex` int(11) DEFAULT NULL,
+  `c_social` int(11) DEFAULT NULL,
+  `c_totalmoney` double DEFAULT NULL,
+  `c_paymentscount` int(11) DEFAULT NULL,
+  `c_arpu` double DEFAULT NULL,
+  `c_arpau` double DEFAULT NULL,
+  `c_totaldebt` double DEFAULT NULL,
+  `c_signups` int(11) DEFAULT NULL,
+  `a_totalcalls` int(11) DEFAULT NULL,
+  `a_totalanswered` int(11) DEFAULT NULL,
+  `a_totalcallsduration` int(11) DEFAULT NULL,
+  `a_averagecallduration` int(11) DEFAULT NULL,
+  `e_switches` int(11) DEFAULT NULL,
+  `e_pononu` int(11) DEFAULT NULL,
+  `e_docsis` int(11) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
